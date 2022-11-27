@@ -1,5 +1,5 @@
 
-import my_first_model.src.main.java.MyFirstModel.MyModel;
+import MyFirstModel.MyModel;
 import simudyne.nexus.Server;
 
 public class Main {

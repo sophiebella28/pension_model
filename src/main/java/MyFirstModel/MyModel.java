@@ -1,8 +1,10 @@
 package MyFirstModel;
 
+import scala.collection.Seq;
 import simudyne.core.abm.AgentBasedModel;
 import simudyne.core.abm.GlobalState;
 import simudyne.core.abm.Group;
+import simudyne.core.abm.Sequence;
 import simudyne.core.annotations.Input;
 
 //This is your main model class where you define the components of your model, including the GlobalState, setup, and step.
@@ -18,7 +20,16 @@ public class MyModel extends AgentBasedModel<MyModel.Globals> {
     // Number of pension funds
     @Input(name = "Number of Pension Funds")
     public int nmPensionFunds = 1;
-    }
+    public double time;
+    @Input(name = "Time Step in ticks")
+    public long timeStep = 1;
+
+    @Input(name = "Time Step in ticks")
+    public double drift = 0.000558;
+
+    @Input(name = "Time Step in ticks")
+    public double volatility = 0.027388;
+}
 
     @Override
     public void init() {
@@ -34,12 +45,12 @@ public class MyModel extends AgentBasedModel<MyModel.Globals> {
         // - bond controller
         // - controller of interest rates or something idk - maybe this stays in the bond controller
 
-        // Generates given number of Pension Funds
+        // Generates given number of pension funds
         Group<PensionFund> pensionFundGroup = generateGroup(PensionFund.class, getGlobals().nmPensionFunds);
 
         Group<BondIssuer> bondIssuerGroup = generateGroup(BondIssuer.class, 1);
 
-        // connects all of the groups - all traders are connected to the desks and vice versa
+        // Fully connects pension funds with bond issuer
         pensionFundGroup.fullyConnected(bondIssuerGroup, Links.MarketLink.class);
 
         bondIssuerGroup.fullyConnected(pensionFundGroup, Links.MarketLink.class);
@@ -53,6 +64,11 @@ public class MyModel extends AgentBasedModel<MyModel.Globals> {
     @Override
     public void step() {
         super.step();
+        // a time variable so that current tick doesnt need to be passed around - hasnt been fully refactored into the code
+        getGlobals().time = getContext().getTick() * getGlobals().timeStep;
+        Sequence payCoupons = Sequence.create(PensionFund.requestCoupons(getGlobals().time), BondIssuer.giveCoupons); // TODO: look into whether I can access time non statically
+        Sequence payLiabilities = Sequence.create(PensionFund.payLiabilities);
+        Sequence updateInterest = Sequence.create(BondIssuer.updateInterest, PensionFund.receiveInterestRates(getGlobals().time, getGlobals().timeStep));
         // 1. government gives funds their interest + whatever values they're owed depending on bonds
         // 2. funds pay their liabilities
         // 3. increment values of bonds + send new values to pension fund (this should LATER be modelled by a synthetic market)

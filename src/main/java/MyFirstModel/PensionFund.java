@@ -6,6 +6,7 @@ import simudyne.core.abm.Agent;
 import simudyne.core.annotations.Variable;
 
 import java.util.List;
+import java.util.Optional;
 
 public class PensionFund extends Agent<MyModel.Globals> {
     @Variable
@@ -13,12 +14,15 @@ public class PensionFund extends Agent<MyModel.Globals> {
 
     @Variable
     public double liabilities;
+    // Currently we assume that this never changes - the pension scheme needs to pay the same amount of money every tick forever
 
     @Variable
     public double fixedBondsVal;
 
     @Variable
     public double indexBondsVal;
+
+    private double currentRate;
 
     private List<InterestBond> interestBonds;
 
@@ -42,5 +46,23 @@ public class PensionFund extends Agent<MyModel.Globals> {
         });
     }
 
+    public static Action<PensionFund> receiveInterestRates(double time, double timestep) {
+           return Action.create(PensionFund.class, pensionFund -> {
+                pensionFund.currentRate = pensionFund.getMessagesOfType(Messages.InterestUpdate.class).stream()
+                        .map(request -> request.currentRate).findFirst().orElse(0.0);
+                double moneyNeeded = pensionFund.liabilities - pensionFund.valuePortfolioAtNextTimestep();
+                double totalBondsToPurchase = 20 * moneyNeeded; // As we assume a 5% interest rate
+                // TODO: make this much more complex
+                InterestBond newBond = new InterestBond(time + 13 * timestep, pensionFund.currentRate, totalBondsToPurchase);
+                pensionFund.interestBonds.add(newBond);
+            }); }
 
+    private double valuePortfolioAtNextTimestep() {
+        double time = getGlobals().time;
+        double totalVal = 0.0;
+        for (InterestBond bond : interestBonds) {
+            totalVal += bond.requestCouponPayments(time + getGlobals().timeStep);
+        }
+        return totalVal;
+    }
 }

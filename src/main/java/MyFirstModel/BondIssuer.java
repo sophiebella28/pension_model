@@ -5,6 +5,7 @@ import simudyne.core.abm.Agent;
 import simudyne.core.annotations.Variable;
 
 import java.util.List;
+import java.util.Random;
 
 public class BondIssuer extends Agent<MyModel.Globals> {
 
@@ -21,11 +22,14 @@ public class BondIssuer extends Agent<MyModel.Globals> {
                 bondIssuer.moneyPaid += totalCouponsToPay;
             });
 
-    public static Action<BondIssuer> actionB =
+    public static Action<BondIssuer> updateInterest =
             Action.create(BondIssuer.class, bondIssuer -> {
-
-
+                bondIssuer.updateInterestRate();
+                bondIssuer.getLinks(Links.MarketLink.class).send(Messages.InterestUpdate.class, (msg, link) -> msg.currentRate = bondIssuer.interestRate);
             });
+    void updateInterestRate() {
+        interestRate += getGlobals().drift * getGlobals().timeStep + getGlobals().volatility * new Random().nextGaussian() * Math.sqrt(getGlobals().timeStep);
+    }
 
 
 }

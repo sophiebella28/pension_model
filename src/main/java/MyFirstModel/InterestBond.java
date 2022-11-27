@@ -1,20 +1,26 @@
 package MyFirstModel;
 
 public class InterestBond {
-    
-    private double finalCoupon;
-    private double endTick;
-    private double rate;
 
-    public double getValueAtNextTimestep(double currentValue) {
-        return (1.05) * currentValue;
+    private double endTime;
+    private double rate;
+    private double faceValue;
+
+    public InterestBond(double endTime, double rate, double faceValue) {
+        this.endTime = endTime;
+        this.rate = rate;
+        this.faceValue = faceValue;
+    }
+
+    public double getValueAtNextTimestep(double time) {
+        return (1.05) * faceValue; // this is useless rn
     }
 
     public double requestCouponPayments(double time) {
-        if (time == endTick) {
-            return finalCoupon;
+        if (time == endTime) {
+            return faceValue;
         } else {
-            return rate;
+            return rate * faceValue;
         }
     }
 
