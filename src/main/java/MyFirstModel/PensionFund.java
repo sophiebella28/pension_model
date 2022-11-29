@@ -5,6 +5,7 @@ import simudyne.core.abm.Action;
 import simudyne.core.abm.Agent;
 import simudyne.core.annotations.Variable;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -24,9 +25,12 @@ public class PensionFund extends Agent<MyModel.Globals> {
 
     private double currentRate;
 
-    private List<InterestBond> interestBonds;
+    private final List<InterestBond> interestBonds;
 
-
+    public PensionFund() {
+        interestBonds = new ArrayList<InterestBond>();
+        liabilities = 100;
+    }
 
     public static Action<PensionFund> payLiabilities =
             Action.create(PensionFund.class, pensionFund -> {
@@ -52,17 +56,21 @@ public class PensionFund extends Agent<MyModel.Globals> {
                         .map(request -> request.currentRate).findFirst().orElse(0.0);
                 double moneyNeeded = pensionFund.liabilities - pensionFund.valuePortfolioAtNextTimestep();
                 double totalBondsToPurchase = 20 * moneyNeeded; // As we assume a 5% interest rate
+               System.out.println("current rate:" + pensionFund.currentRate);
                 // TODO: make this much more complex
+               if (totalBondsToPurchase > 0.0) {
                 InterestBond newBond = new InterestBond(time + 13 * timestep, pensionFund.currentRate, totalBondsToPurchase);
                 pensionFund.interestBonds.add(newBond);
+               }
             }); }
 
     private double valuePortfolioAtNextTimestep() {
         double time = getGlobals().time;
-        double totalVal = 0.0;
+        double totalVal = cashVal;
         for (InterestBond bond : interestBonds) {
             totalVal += bond.requestCouponPayments(time + getGlobals().timeStep);
         }
+        System.out.println("Value next timestep " + totalVal);
         return totalVal;
     }
 }

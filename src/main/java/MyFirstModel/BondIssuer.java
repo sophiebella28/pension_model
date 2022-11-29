@@ -15,11 +15,15 @@ public class BondIssuer extends Agent<MyModel.Globals> {
     @Variable
     public double moneyPaid;
 
+    public BondIssuer() {
+        interestRate = 0.02;
+    }
+
     public static Action<BondIssuer> giveCoupons =
             Action.create(BondIssuer.class, bondIssuer -> {
                 double totalCouponsToPay = bondIssuer.getMessagesOfType(Messages.CouponRequest.class).stream()
                         .map(request -> request.coupons).reduce(0.0, Double::sum);
-                bondIssuer.moneyPaid += totalCouponsToPay;
+                bondIssuer.moneyPaid = totalCouponsToPay;
             });
 
     public static Action<BondIssuer> updateInterest =

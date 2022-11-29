@@ -24,17 +24,17 @@ public class MyModel extends AgentBasedModel<MyModel.Globals> {
     @Input(name = "Time Step in ticks")
     public long timeStep = 1;
 
-    @Input(name = "Time Step in ticks")
+    @Input(name = "Drift")
     public double drift = 0.000558;
 
-    @Input(name = "Time Step in ticks")
-    public double volatility = 0.027388;
+    @Input(name = "Volatility")
+    public double volatility = 0.0027388;
 }
 
     @Override
     public void init() {
-        registerAgentTypes();
-        registerLinkTypes();
+        registerAgentTypes(PensionFund.class, BondIssuer.class) ;
+        registerLinkTypes(Links.MarketLink.class);
     }
 
     //Define your agent groups and connections in the setup. This is where the environment and agents are generated
@@ -79,7 +79,9 @@ public class MyModel extends AgentBasedModel<MyModel.Globals> {
         //
         // + buy the necessary instruments
         //     from the government
-
+        run(payCoupons);
+        run(payLiabilities);
+        run(updateInterest);
 
 
     }
