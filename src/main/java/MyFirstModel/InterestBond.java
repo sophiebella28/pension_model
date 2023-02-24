@@ -19,8 +19,10 @@ public class InterestBond {
     public double requestCouponPayments(double time) {
         if (time == endTime) {
             return faceValue;
-        } else {
+        } else if (time < endTime){
             return rate * faceValue;
+        } else {
+            return 0.0; // TODO: this is kinda inefficient
         }
     }
 

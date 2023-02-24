@@ -17,11 +17,11 @@ public class PensionFund extends Agent<MyModel.Globals> {
     public double liabilities;
     // Currently we assume that this never changes - the pension scheme needs to pay the same amount of money every tick forever
 
-    @Variable
-    public double fixedBondsVal;
-
-    @Variable
-    public double indexBondsVal;
+//    @Variable
+//    public double fixedBondsVal;
+//
+//    @Variable
+//    public double indexBondsVal;
 
     private double currentRate;
 

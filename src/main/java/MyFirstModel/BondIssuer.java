@@ -15,8 +15,11 @@ public class BondIssuer extends Agent<MyModel.Globals> {
     @Variable
     public double moneyPaid;
 
+    private Random random;
+
     public BondIssuer() {
         interestRate = 0.02;
+        random = new Random();
     }
 
     public static Action<BondIssuer> giveCoupons =
@@ -26,13 +29,13 @@ public class BondIssuer extends Agent<MyModel.Globals> {
                 bondIssuer.moneyPaid = totalCouponsToPay;
             });
 
-    public static Action<BondIssuer> updateInterest =
-            Action.create(BondIssuer.class, bondIssuer -> {
-                bondIssuer.updateInterestRate();
+    public static Action<BondIssuer> updateInterest(double theta) {
+            return Action.create(BondIssuer.class, bondIssuer -> {
+                bondIssuer.updateInterestRate(theta);
                 bondIssuer.getLinks(Links.MarketLink.class).send(Messages.InterestUpdate.class, (msg, link) -> msg.currentRate = bondIssuer.interestRate);
-            });
-    void updateInterestRate() {
-        interestRate += getGlobals().drift * getGlobals().timeStep + getGlobals().volatility * new Random().nextGaussian() * Math.sqrt(getGlobals().timeStep);
+            });}
+    void updateInterestRate(double theta) {
+        interestRate += (theta - getGlobals().drift * interestRate) * interestRate + getGlobals().volatility * random.nextGaussian();
     }
 
 

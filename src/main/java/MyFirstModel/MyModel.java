@@ -13,7 +13,7 @@ public class MyModel extends AgentBasedModel<MyModel.Globals> {
     //Globals stores all of your variables and data structures that you want your agents to be able to access
     //Store information here that is system-level knowledge (ie - # of Agents or static variables)
     public static class Globals extends GlobalState {
-    // List of global variables that i want
+    // List of global variables that I want
     // - Number of pension funds
     // - DB of pension fund - get rid of later but good for now
     // - DB time period or something?????????????
@@ -25,15 +25,25 @@ public class MyModel extends AgentBasedModel<MyModel.Globals> {
     public long timeStep = 1;
 
     @Input(name = "Drift")
-    public double drift = 0.000558;
+    public double drift = 0.1;
 
     @Input(name = "Volatility")
-    public double volatility = 0.0027388;
+    public double volatility = 0.1;
+
+    public double[] thetas = {-0.09592369, -0.06244385, -0.03235271, -0.00548885,  0.01830917,  0.03920281,
+                0.0573535,   0.07292267,  0.08607178,  0.09696226,  0.10575556,  0.11261311,
+                0.11769636,  0.12116674,  0.1231857,   0.12391468,  0.12351512,  0.12214847,
+                0.11997615,  0.11715962,  0.11386031,  0.11023967,  0.10645913,  0.10268015,
+                0.09906415,  0.09577258,  0.09296688,  0.09080849,  0.08945885,  0.08907941,
+                0.08983161,  0.09187688,  0.09537666,  0.10049241,  0.10738555,  0.11621753,
+                0.1271498,   0.14034378,  0.15596093, 0.17416268};
+
+
 }
 
     @Override
     public void init() {
-        registerAgentTypes(PensionFund.class, BondIssuer.class) ;
+        registerAgentTypes(PensionFund.class, BondIssuer.class);
         registerLinkTypes(Links.MarketLink.class);
     }
 
@@ -67,8 +77,11 @@ public class MyModel extends AgentBasedModel<MyModel.Globals> {
         // a time variable so that current tick doesnt need to be passed around - hasnt been fully refactored into the code
         getGlobals().time = getContext().getTick() * getGlobals().timeStep;
         Sequence payCoupons = Sequence.create(PensionFund.requestCoupons(getGlobals().time), BondIssuer.giveCoupons); // TODO: look into whether I can access time non statically
+        // pays coupons to bond holders
         Sequence payLiabilities = Sequence.create(PensionFund.payLiabilities);
-        Sequence updateInterest = Sequence.create(BondIssuer.updateInterest, PensionFund.receiveInterestRates(getGlobals().time, getGlobals().timeStep));
+        // pension fund pays its liabilities
+        Sequence updateInterest = Sequence.create(BondIssuer.updateInterest(getGlobals().thetas[(int) Math.round(getGlobals().time)]), PensionFund.receiveInterestRates(getGlobals().time, getGlobals().timeStep));
+        //
         // 1. government gives funds their interest + whatever values they're owed depending on bonds
         // 2. funds pay their liabilities
         // 3. increment values of bonds + send new values to pension fund (this should LATER be modelled by a synthetic market)
