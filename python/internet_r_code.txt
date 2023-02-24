@@ -1,0 +1,310 @@
+#=========================================================================#
+# Financial Econometrics & Derivatives, ML/DL using R, Python, Tensorflow
+# by Sang-Heon Lee
+#
+# https://kiandlee.blogspot.com
+#————————————————————————-#
+# Numerical Simulation for Hull-White 1 factor model
+#=========================================================================#
+
+library(Rfast)  # colCumProds
+
+graphics.off()  # clear all graphs
+rm(list = ls()) # remove all files from your workspace
+
+setwd(“D:/a_book_FIER_Ki_Lee/ch05_HW1F/code”)
+
+# Functions for numerical Integration
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+#  I(t) = Int_0^t sigma(s)^2 A exp(Bs) ds
+#————————————————————-#
+#           t
+#  I(t) = ∫  σ(u)^2 A exp(Bu) du
+#          0
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+fI<–function(t, A, B, lt.HW) {
+    M <– 0; value <– 0
+
+    tVol <– lt.HW$tsig   # volatility tenor
+    Vol  <– lt.HW$sigma  # volatility vector
+    nVol <– lt.HW$nsig   # # of volatility
+
+    # find Maximum M from j which is t_j < t
+    M <– ifelse(length(which(tVol<=t))==0,1,max(which(tVol<=t))+1)
+
+    # summation part
+    if (B==0) {
+        if (M==1) value <– value + Vol[1]^2*A*t
+        else {
+            for (i in 1:(M–1)) {
+                add <– Vol[i]^2*A*(tVol[i] – ifelse(i==1,0,tVol[i–1]))
+                value <– value + add
+            }
+            add <– Vol[ifelse(M==(nVol+1),M–1,M)]^2*A*(t–tVol[M–1])
+            value <– value + add
+        }
+    }
+    else {
+      if (M==1) { value <– value + Vol[1]^2*A/B*(exp(B*t)–1)}
+      else {
+          for (i in 1:(M–1)) {
+              add <– Vol[i]^2*A/B*
+                     (exp(B*tVol[i])–ifelse(i==1,1,exp(B*tVol[i–1])))
+              value <– value + add
+          }
+          add <– Vol[ifelse(M==(nVol+1),M–1,M)]^2*A/B*
+                 (exp(B*t)–exp(B*tVol[M–1]))
+          value <– value + add
+      }
+    }
+    return(value)
+}
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+#  A(s,t)=e^(-Int_s^t a(v) dv)
+#————————————————————-#
+#                   s
+#  A(s,t) = exp( -∫ a(v)dv )
+#                  t
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+fA<–function(s, t, lt.HW) {
+    tau <– lt.HW$tkap       # tau
+    K1  <– lt.HW$kappa[1]   # short-term kappa
+    K2  <– lt.HW$kappa[2]   # long-term kappa
+
+    if      (tau <= s) f <– exp(–K2*(t–s))
+    else if (t < tau ) f <– exp(–K1*(t–s))
+    else               f <– exp(–K1*(tau–s)–K2*(t–tau))
+
+    return(f)
+}
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+#  B(s,t)=Int_s^t e^(-Int_t^u a(v) dv) du
+#————————————————————-#
+#             t       u
+#  B(s,t) = ∫ exp( -∫ a(v)dv ) du
+#            s       t
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+fB1<–function(s, t, kappa) {return((1 – exp(–kappa*(t–s)))/ kappa)}
+
+fB<–function(s, t, lt.HW) {
+    tau <– lt.HW$tkap       # tau
+    K1  <– lt.HW$kappa[1]   # short-term kappa
+    K2  <– lt.HW$kappa[2]   # long-term kappa
+
+    if      (tau <= s) f <– fB1(s, t, K2)
+    else if (t < tau ) f <– fB1(s, t, K1)
+    else  f <– fB1(s,tau,K1)+exp(–K1*(tau–s))*fB1(tau,t,K2)
+
+    return(f)
+}
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+#  Zeta(t) = Int_0^t σ(u)^2 e^(-2 Int_u^t a(v) dv) du
+#————————————————————-#
+#             t               t
+#  Zeta(t) = ∫ σ(u)^2 exp( -2∫ a(v)dv ) du
+#            0               u
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+fZeta<–function(t, lt.HW) {
+    tau <– lt.HW$tkap       # tau
+    K1  <– lt.HW$kappa[1]   # short-term kappa
+    K2  <– lt.HW$kappa[2]   # long-term kappa
+
+    if (t < tau) f = exp(–2*K1*t)*fI(t,1,2*K1,lt.HW)
+    else  f = exp(–2*K2*(t–tau)–2*K1*tau)*fI(tau,1,2*K1,lt.HW)+
+          exp(–2*K2*t)*(fI(t,1,2*K2,lt.HW)–fI(tau,1,2*K2,lt.HW))
+
+    return(f)
+}
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+#  Z(t) = Int_0^t σ(u)^2 e^(-Int_u^t a(v) dv) B(u,t) du
+#————————————————————-#
+#          t              t
+#  Z(t) = ∫ σ(u)^2 exp( -∫ a(v)dv ) B(u,t) du
+#         0              u
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+fZ1<–function(t, kappa, lt.HW) {
+    I1 = exp(  –kappa*t)*fI(t,1,  kappa, lt.HW) / kappa
+    I2 = exp(–2*kappa*t)*fI(t,1,2*kappa, lt.HW) / kappa
+    return(I1 – I2)
+}
+
+fZ<–function(t, lt.HW) {
+    tau <– lt.HW$tkap       # tau
+    K1  <– lt.HW$kappa[1]   # short-term kappa
+    K2  <– lt.HW$kappa[2]   # long-term kappa
+
+    if (t < tau)
+        f = fZ1(t, K1, lt.HW)
+    else {
+        I1 = exp(–K2*(t–tau))*fZ1(tau, K1, lt.HW)
+        I2 = exp(–K2*(t–tau))*fB(tau,t,lt.HW)*
+             exp(–2*K1*tau)*fI(tau,1,2*K1,lt.HW)
+        I3 = exp(–K2*t) * fI(tau, 1, K2, lt.HW) / K2
+        I4 = exp(–2*K2*t) * fI(tau, 1, 2*K2, lt.HW) / K2
+        f =  I1 + I2 + fZ1(t, K2, lt.HW) – I3 + I4
+    }
+    return(f)
+}
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+#  Omega(t,T) = Int_0^t sigma(s)^2 [B(s,t)^2 – B(s,T)^2] ds
+#————————————————————-#
+#                t
+#  Omega(t,T) = ∫ σ(s)^2 [B(s,t)^2 – B(s,T)^2] ds
+#               0
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+fOmega<–function(t, T, lt.HW) {
+    return(–fB(t,T,lt.HW) * (2.0*fZ(t,lt.HW) +
+                             fB(t,T,lt.HW)*fZeta(t,lt.HW)))
+}
+
+#=========================================================================#
+#             Main : Hull-White 1 Factor Model Simulation
+#=========================================================================#
+
+    #—————————————————————–#
+    # Information List for the Hull-White model
+    #—————————————————————–#
+    # – tkap  : threshold year which divide mean-reversion speed
+    # – kappa : mean-reversion speed parameters
+    # – tsig  : maturity vector for volatility parameters
+    # – sigma : volatility parameter vector
+    # – tDF   : maturity vector for spot rates
+    # – rc    :spot rates curve
+    #—————————————————————–#
+
+    # list object which contain Hull-White model related information
+    lt.HW <– list(
+        tkap  = 10,
+        kappa = c(0.05, 0.02),
+        tsig  = c(1.0, 2.0, 3.0, 5.0, 7.0, 10.0),
+        sigma = c(0.004761583,0.004000462,0.004073902,
+                  0.004487176,0.00507169,0.00496086),
+        tDF   = c(1.0, 2.0,3.0,5.0,7.0,10.0,15.0,20.0),
+        rc    = c(0.01596,0.01608,0.016525,0.01756,
+                  0.0185,0.01973,0.02056,0.020925)
+        )
+
+    # Add other information to list
+    lt.HW$nDF  <– length(lt.HW$tDF)   # # of spot
+    lt.HW$nsig <– length(lt.HW$sigma) # # of vol
+    lt.HW$nkap <– length(lt.HW$kappa) # # of kappa
+
+    # Check for Numerical Integration Functions for HW1F
+    m.temp <– matrix(NA,15,5)
+    colnames(m.temp) <– c(“I”, “B”, “Zeta”, “Z”, “Omega”)
+    for(i in 1:15) {
+        m.temp[i,1] <– fI    (i, 2, 3, lt.HW)
+        m.temp[i,2] <– fB    (0.5,  i, lt.HW)
+        m.temp[i,3] <– fZeta (i,       lt.HW)
+        m.temp[i,4] <– fZ    (i,       lt.HW)
+        m.temp[i,5] <– fOmega(0.5,  i, lt.HW)
+    }
+    print(“Check for Numerical Integration Functions for HW1F”)
+    print(m.temp)
+
+    # Discount Factor
+    lt.HW$DF   <– exp(–lt.HW$tDF*lt.HW$rc)
+
+    #—————————————————————–#
+    # Preprocessing for simulation
+    #—————————————————————–#
+
+    # Simulation information
+    denom.1y     <– 365    # # of dt in 1-year
+
+    # t : valuation date, T : maturity
+    lt.HW.sim    <– list(t=0, T=50, dt=1/denom.1y, nscenario =5000)
+
+    lt.HW.sim$nt <– round(lt.HW.sim$t*denom.1y,0)
+    lt.HW.sim$nT <– round(lt.HW.sim$T*denom.1y,0)
+
+    # spit the time axis by dt
+    v.Ti <– seq(lt.HW.sim$dt, lt.HW.sim$T, length = lt.HW.sim$nT)
+
+    #—————————————————————–#
+    # Linear Interpolation of spot rate curve
+    #—————————————————————–#
+    # rule=2 : For outside the interval [min(x), max(x)],
+    #          the value at the closest data extremeis used.
+    #—————————————————————–#
+    frci <–approxfun(x=lt.HW$tDF, y=lt.HW$rc, rule=2)
+
+    v.rci <– frci(v.Ti)             # interpolated spot rates
+    v.DFi <– exp(–v.Ti*v.rci) # interpolated DF
+
+    #—————————————————————–#
+    # temporary use for blog width adjustment
+    #—————————————————————–#
+    sim <– lt.HW.sim
+    par <– lt.HW
+    dt  <– lt.HW.sim$dt
+
+    # standard normal random error
+    set.seed(123456)
+
+    # predetermined vector
+    v.A <– v.Zeta <– v.dZeta.sqrt <– v.B <– v.Omega <– rep(0, sim$nT)
+
+    for (n in 1:sim$nT) {
+      v.A[n]     <– fA    (v.Ti[n]–dt, v.Ti[n], par)
+      v.Zeta[n]  <– fZeta (v.Ti[n],             par)
+      v.B[n]     <– fB    (v.Ti[n]–dt, v.Ti[n], par)
+      v.Omega[n] <– fOmega(v.Ti[n]–dt, v.Ti[n], par)
+    }
+
+    v.dZeta.sqrt <– c(sqrt(v.Zeta[1]),
+                      sqrt(v.Zeta[–1]–v.A[–1]^2*v.Zeta[–sim$nT]))
+
+    # selecting some indices because plotting is time-consuming
+    v.idx.sample <– sample(1:sim$nscenario, 500)
+
+    #—————————————————————–#
+    # Simulation Part
+    #—————————————————————–#
+
+    # interpolated discount factor from initial yield curve
+    v.P0 <– v.DFi
+    # ratio of bond price P(0,t+dt)/P(0,t)
+    v.P0T_P0T1 <– c(v.P0[1]/1,v.P0[–1]/v.P0[–sim$nT])
+
+    m.P.ts   <– matrix(0, sim$nT, sim$nscenario ) # P(t,t+dt)
+    m.Rsc.ts <– matrix(0, sim$nT, sim$nscenario ) # short rate
+
+    # Simulate from now on.
+
+    # for n=1
+    m.P.ts  [1,] <– v.P0T_P0T1[1]
+    m.Rsc.ts[1,] <– –log(m.P.ts[1,])/dt
+    xt <– rnorm(sim$nscenario, 0, 1)*v.dZeta.sqrt[1]
+
+    for(n in 2:sim$nT) {
+        print(n)
+        m.P.ts[n,] <– v.P0T_P0T1[n]*exp(–xt*v.B[n]+0.5*v.Omega[n])
+        xt <– xt*v.A[n] + rnorm(sim$nscenario, 0, 1)*v.dZeta.sqrt[n]
+    }
+
+    m.Rsc.ts <– –log(m.P.ts)/dt      # spot rates
+    m.DF.ts  <– colCumProds(m.P.ts)  # Dscount Factors
+    m.R0T.ts <– –log(m.DF.ts)/v.Ti   # future spot rates
+
+    ## plot paths
+    t <– seq(dt, lt.HW.sim$T, dt)
+
+    x11(width=6, height=5);
+        matplot(m.P.ts[,v.idx.sample], type=“l”, lty=1,
+                xlab=“Mat”,ylab=“P(t,t+dt)”,main=“Simulated ZCB”)
+    x11(width=6, height=5);
+        matplot(m.Rsc.ts[,v.idx.sample], type=“l”, lty=1,
+                xlab=“Mat”,ylab=“R(t,t+dt)”,main=“Simulated Short Rate”)
+    x11(width=6, height=5);
+        matplot(m.DF.ts[,v.idx.sample], type=“l”, lty=1,
+                xlab=“Mat”,ylab=“DF(0,T)”  ,main=“Simulated Discount Factor”)
+    x11(width=6, height=5);
+        matplot(m.R0T.ts[,v.idx.sample], type=“l”, lty=1,
+                xlab=“Mat”,ylab=“R(0,T)”   ,main=“Simulated Spot Rate”)
