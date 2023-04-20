@@ -1,5 +1,6 @@
 package MyFirstModel;
 
+import org.apache.commons.math3.distribution.MultivariateNormalDistribution;
 import simudyne.core.abm.Action;
 import simudyne.core.abm.Agent;
 import simudyne.core.annotations.Variable;
@@ -23,6 +24,7 @@ public class BondIssuer extends Agent<MyModel.Globals> {
     public double moneyPaid;
 
     private Random random;
+    private MultivariateNormalDistribution mvn;
 
     public BondIssuer() {
         longRate = 0.02;
@@ -30,6 +32,7 @@ public class BondIssuer extends Agent<MyModel.Globals> {
         interestRate = 0.02;
         shortRate = 0.02;
         random = new Random();
+        mvn = new MultivariateNormalDistribution(new double[]{0.0, 0.0}, new double[][] {{1.0,0.19},{0.19,1.0}});
     }
 
     public static Action<BondIssuer> giveCoupons =
@@ -45,13 +48,9 @@ public class BondIssuer extends Agent<MyModel.Globals> {
                 bondIssuer.getLinks(Links.MarketLink.class).send(Messages.InterestUpdate.class, (msg, link) -> msg.currentRate = bondIssuer.interestRate);
             });}
     void updateRates(double theta) {
-        // TODO: put thetas back in, recalibrate with my own parameters instead of ones from the 1900s
-        // This iteration uses a model conceived by KEVIN C. AHLGRIM, STEPHEN P. D’ARCY, AND RICHARD W. GORVETT
-        // Proposed in the paper MODELING FINANCIAL SCENARIOS: A FRAMEWORK FOR THE ACTUARIAL PROFESSION
-        inflationRate += getGlobals().driftInflation * (getGlobals().muInflation - inflationRate) + getGlobals().volatilityInflation * random.nextGaussian();
-        shortRate += getGlobals().driftShortTerm * (longRate - shortRate) + getGlobals().volatilityShortTerm * random.nextGaussian();
-        longRate += getGlobals().driftLongTerm * (getGlobals().muShortTerm - longRate)  + getGlobals().volatilityLongTerm * random.nextGaussian();
-        interestRate += shortRate * inflationRate;
+        double[] randomVals = mvn.sample();
+        interestRate += (theta - getGlobals().driftShortTerm * interestRate) * interestRate + getGlobals().volatilityShortTerm * randomVals[0];
+        inflationRate = Math.exp(0.417 + 0.764 * Math.log(inflationRate) + randomVals[1]);
     }
 
 
