@@ -46,6 +46,8 @@ public class BondIssuer extends Agent<MyModel.Globals> {
             });}
     void updateRates(double theta) {
         // TODO: put thetas back in, recalibrate with my own parameters instead of ones from the 1900s
+        // This iteration uses a model conceived by KEVIN C. AHLGRIM, STEPHEN P. D’ARCY, AND RICHARD W. GORVETT
+        // Proposed in the paper MODELING FINANCIAL SCENARIOS: A FRAMEWORK FOR THE ACTUARIAL PROFESSION
         inflationRate += getGlobals().driftInflation * (getGlobals().muInflation - inflationRate) + getGlobals().volatilityInflation * random.nextGaussian();
         shortRate += getGlobals().driftShortTerm * (longRate - shortRate) + getGlobals().volatilityShortTerm * random.nextGaussian();
         longRate += getGlobals().driftLongTerm * (getGlobals().muShortTerm - longRate)  + getGlobals().volatilityLongTerm * random.nextGaussian();
