@@ -24,11 +24,29 @@ public class MyModel extends AgentBasedModel<MyModel.Globals> {
     @Input(name = "Time Step in ticks")
     public long timeStep = 1;
 
-    @Input(name = "Drift")
-    public double drift = 0.1;
+    @Input(name = "Drift Long Term Interest Rates")
+    public double driftLongTerm = 0.1;
 
-    @Input(name = "Volatility")
-    public double volatility = 0.1;
+    @Input(name = "Volatility Long Term Interest Rates")
+    public double volatilityLongTerm = 0.0165;
+
+    @Input(name = "Drift Short Term Interest Rates")
+    public double driftShortTerm = 1.0;
+
+    @Input(name = "Volatility Short Term Interest Rates")
+    public double volatilityShortTerm = 0.01;
+
+    @Input(name = "Mu Short Term Interest Rates")
+    public double muShortTerm = 0.028;
+
+    @Input(name = "Drift Inflation")
+    public double driftInflation = 0.47;
+
+    @Input(name = "Volatility Inflation")
+    public double volatilityInflation = 0.03;
+
+    @Input(name = "Mu Inflation")
+    public double muInflation = 0.048;
 
     public double[] thetas = {-0.09592369, -0.06244385, -0.03235271, -0.00548885,  0.01830917,  0.03920281,
                 0.0573535,   0.07292267,  0.08607178,  0.09696226,  0.10575556,  0.11261311,
