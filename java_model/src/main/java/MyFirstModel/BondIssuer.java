@@ -50,7 +50,11 @@ public class BondIssuer extends Agent<MyModel.Globals> {
     void updateRates(double theta) {
         double[] randomVals = mvn.sample();
         interestRate += (theta - getGlobals().driftShortTerm * interestRate) * interestRate + getGlobals().volatilityShortTerm * randomVals[0];
+        System.out.println("Inflation Rate Prev" + inflationRate);
+        System.out.println("Random Value" + randomVals[1]);
+        System.out.println("Log" + Math.log(inflationRate));
         inflationRate = Math.exp(0.417 + 0.764 * Math.log(inflationRate) + randomVals[1]);
+        System.out.println("Inflation Rate Next" + inflationRate);
     }
 
 
