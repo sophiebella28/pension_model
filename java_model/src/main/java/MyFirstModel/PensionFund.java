@@ -1,13 +1,11 @@
 package MyFirstModel;
 
-import scala.Int;
 import simudyne.core.abm.Action;
 import simudyne.core.abm.Agent;
 import simudyne.core.annotations.Variable;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 public class PensionFund extends Agent<MyModel.Globals> {
     @Variable
@@ -23,12 +21,16 @@ public class PensionFund extends Agent<MyModel.Globals> {
 //    @Variable
 //    public double indexBondsVal;
 
-    private double currentRate;
+
+    private double currentInterestRate;
+    private double currentInflationRate;
 
     private final List<InterestBond> interestBonds;
+    private final List<IndexBond> indexBonds;
 
     public PensionFund() {
         interestBonds = new ArrayList<InterestBond>();
+        indexBonds = new ArrayList<IndexBond>();
         liabilities = 100;
     }
 
@@ -43,6 +45,9 @@ public class PensionFund extends Agent<MyModel.Globals> {
             for (InterestBond bond : pensionFund.interestBonds) {
                 totalCoupons += bond.requestCouponPayments(time);
             }
+            for (IndexBond bond : pensionFund.indexBonds) {
+                totalCoupons += bond.requestCouponPayments(time, pensionFund.currentInflationRate);
+            }
             final double finalTotalCoupons = totalCoupons;
             pensionFund.cashVal += totalCoupons;
             pensionFund.getLinks(Links.MarketLink.class).send(Messages.CouponRequest.class, (msg, link) -> msg.coupons = finalTotalCoupons);
@@ -52,15 +57,20 @@ public class PensionFund extends Agent<MyModel.Globals> {
 
     public static Action<PensionFund> receiveInterestRates(double time, double timestep) {
            return Action.create(PensionFund.class, pensionFund -> {
-                pensionFund.currentRate = pensionFund.getMessagesOfType(Messages.InterestUpdate.class).stream()
-                        .map(request -> request.currentRate).findFirst().orElse(0.0);
+                double[] rates = pensionFund.getMessagesOfType(Messages.InterestUpdate.class).stream()
+                        .map(request -> request.rates).findFirst().orElse(new double[] {0.0, 0.0});
+                pensionFund.currentInterestRate = rates[0];
+                pensionFund.currentInflationRate = rates[1]; // extract the rates out of the message object
+
                 double moneyNeeded = pensionFund.liabilities - pensionFund.valuePortfolioAtNextTimestep();
                 double totalBondsToPurchase = 20 * moneyNeeded; // As we assume a 5% interest rate
-               System.out.println("current rate:" + pensionFund.currentRate);
+               System.out.println("current rate:" + pensionFund.currentInterestRate);
                 // TODO: make this much more complex
                if (totalBondsToPurchase > 0.0) {
-                InterestBond newBond = new InterestBond(time + 13 * timestep, pensionFund.currentRate, totalBondsToPurchase);
-                pensionFund.interestBonds.add(newBond);
+                InterestBond newInterestBond = new InterestBond(time + 13 * timestep, pensionFund.currentInterestRate, totalBondsToPurchase / 2);
+                pensionFund.interestBonds.add(newInterestBond);
+                IndexBond newIndexBond = new IndexBond(time + 13 * timestep, pensionFund.currentInterestRate, pensionFund.currentInflationRate, totalBondsToPurchase/ 2);
+                pensionFund.indexBonds.add(newIndexBond);
                }
             }); }
 
@@ -69,6 +79,9 @@ public class PensionFund extends Agent<MyModel.Globals> {
         double totalVal = cashVal;
         for (InterestBond bond : interestBonds) {
             totalVal += bond.requestCouponPayments(time + getGlobals().timeStep);
+        }
+        for (IndexBond bond : indexBonds) {
+            totalVal += bond.requestCouponPayments(time + getGlobals().timeStep, currentInflationRate);
         }
         System.out.println("Value next timestep " + totalVal);
         return totalVal;

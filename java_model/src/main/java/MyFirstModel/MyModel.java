@@ -31,7 +31,7 @@ public class MyModel extends AgentBasedModel<MyModel.Globals> {
     public double volatilityLongTerm = 0.0165;
 
     @Input(name = "Drift Short Term Interest Rates")
-    public double driftShortTerm = 1.0;
+    public double driftShortTerm = 0.2;
 
     @Input(name = "Volatility Short Term Interest Rates")
     public double volatilityShortTerm = 0.01;

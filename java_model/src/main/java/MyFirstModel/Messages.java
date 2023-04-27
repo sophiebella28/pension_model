@@ -8,6 +8,7 @@ public class Messages {
     }
 
     public static class InterestUpdate extends Message {
-        public double currentRate;
+        public double[] rates;
+
     }
 }

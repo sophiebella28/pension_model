@@ -45,16 +45,18 @@ public class BondIssuer extends Agent<MyModel.Globals> {
     public static Action<BondIssuer> updateInterest(double theta) {
             return Action.create(BondIssuer.class, bondIssuer -> {
                 bondIssuer.updateRates(theta);
-                bondIssuer.getLinks(Links.MarketLink.class).send(Messages.InterestUpdate.class, (msg, link) -> msg.currentRate = bondIssuer.interestRate);
+                bondIssuer.getLinks(Links.MarketLink.class).send(Messages.InterestUpdate.class,
+                        (msg, link) -> {
+                    msg.rates = new double[] {bondIssuer.interestRate, bondIssuer.inflationRate};
+                });
             });}
     void updateRates(double theta) {
         double[] randomVals = mvn.sample();
+        System.out.println("first" + (theta - getGlobals().driftShortTerm * interestRate));
+        System.out.println("second" + getGlobals().volatilityShortTerm * randomVals[0]);
         interestRate += (theta - getGlobals().driftShortTerm * interestRate) * interestRate + getGlobals().volatilityShortTerm * randomVals[0];
-        System.out.println("Inflation Rate Prev" + inflationRate);
-        System.out.println("Random Value" + randomVals[1]);
-        System.out.println("Log" + Math.log(inflationRate));
-        inflationRate = Math.exp(0.417 + 0.764 * Math.log(inflationRate) + randomVals[1]);
-        System.out.println("Inflation Rate Next" + inflationRate);
+        inflationRate =  1.0179 * inflationRate + randomVals[1] + 0.0366;
+        System.out.println("Interest Rate Next" + interestRate);
     }
 
 
