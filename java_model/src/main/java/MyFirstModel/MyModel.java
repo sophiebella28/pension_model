@@ -24,29 +24,12 @@ public class MyModel extends AgentBasedModel<MyModel.Globals> {
     @Input(name = "Time Step in ticks")
     public long timeStep = 1;
 
-    @Input(name = "Drift Long Term Interest Rates")
-    public double driftLongTerm = 0.1;
-
-    @Input(name = "Volatility Long Term Interest Rates")
-    public double volatilityLongTerm = 0.0165;
-
     @Input(name = "Drift Short Term Interest Rates")
-    public double driftShortTerm = 0.2;
+    public double driftShortTerm = 0.02;
 
     @Input(name = "Volatility Short Term Interest Rates")
-    public double volatilityShortTerm = 0.01;
+    public double volatilityShortTerm = 0.001;
 
-    @Input(name = "Mu Short Term Interest Rates")
-    public double muShortTerm = 0.028;
-
-    @Input(name = "Drift Inflation")
-    public double driftInflation = 0.47;
-
-    @Input(name = "Volatility Inflation")
-    public double volatilityInflation = 0.03;
-
-    @Input(name = "Mu Inflation")
-    public double muInflation = 0.048;
 
     public double[] thetas = {-0.09592369, -0.06244385, -0.03235271, -0.00548885,  0.01830917,  0.03920281,
                 0.0573535,   0.07292267,  0.08607178,  0.09696226,  0.10575556,  0.11261311,
@@ -94,11 +77,12 @@ public class MyModel extends AgentBasedModel<MyModel.Globals> {
         super.step();
         // a time variable so that current tick doesnt need to be passed around - hasnt been fully refactored into the code
         getGlobals().time = getContext().getTick() * getGlobals().timeStep;
-        Sequence payCoupons = Sequence.create(PensionFund.requestCoupons(getGlobals().time), BondIssuer.giveCoupons); // TODO: look into whether I can access time non statically
+        Sequence payCoupons = Sequence.create(BondIssuer.giveCoupons(getGlobals().time), PensionFund.receiveCoupons(getGlobals().time)); // TODO: look into whether I can access time non statically
         // pays coupons to bond holders
-        Sequence payLiabilities = Sequence.create(PensionFund.payLiabilities);
+        Sequence payLiabilities = Sequence.create(PensionFund.payLiabilities(getGlobals().time));
         // pension fund pays its liabilities
-        Sequence updateInterest = Sequence.create(BondIssuer.updateInterest(getGlobals().thetas[(int) Math.round(getGlobals().time)]), PensionFund.receiveInterestRates(getGlobals().time, getGlobals().timeStep));
+        Sequence updateInterest = Sequence.create(BondIssuer.updateInterest(getGlobals().thetas[(int) Math.round(getGlobals().time)]), PensionFund.receiveInterestRates());
+        Sequence performHedges = Sequence.create(PensionFund.buyHedges(getGlobals().time, getGlobals().timeStep), BondIssuer.receiveHedges());
         //
         // 1. government gives funds their interest + whatever values they're owed depending on bonds
         // 2. funds pay their liabilities
@@ -113,6 +97,7 @@ public class MyModel extends AgentBasedModel<MyModel.Globals> {
         run(payCoupons);
         run(payLiabilities);
         run(updateInterest);
+        run(performHedges);
 
 
     }

@@ -1,6 +1,6 @@
 package MyFirstModel;
 
-public class IndexBond {
+public class IndexBond implements Bond {
 
 
     private final double endTime;
@@ -15,6 +15,12 @@ public class IndexBond {
         this.faceValue = faceValue;
     }
 
+    @Override
+    public double getEndTime() {
+        return endTime;
+    }
+
+    @Override
     public double requestCouponPayments(double time, double currentCPI) {
         if (time == endTime) {
             return couponRate * currentCPI / initialCPI * faceValue;
@@ -24,4 +30,8 @@ public class IndexBond {
             return 0.0; // TODO: this is kinda inefficient
         }
     }
+
+//    public double calculateDuration() {
+//
+//    }
 }
