@@ -35,7 +35,7 @@ public class BondIssuer extends Agent<MyModel.Globals> {
         interestRate = 0.02;
         shortRate = 0.02;
         random = new Random();
-        mvn = new MultivariateNormalDistribution(new double[]{0.0, 0.0}, new double[][] {{1.0,0.19},{0.19,1.0}});
+        mvn = new MultivariateNormalDistribution(new double[]{0.0, 0.0}, new double[][] {{1.0,0.19},{0.19, 1.0}});
         bonds = new ArrayList<>();
     }
 
@@ -84,7 +84,7 @@ public class BondIssuer extends Agent<MyModel.Globals> {
         interestRate += ( getGlobals().driftShortTerm ) * interestRate + getGlobals().volatilityShortTerm * randomVals[0];
         System.out.println(randomVals[1]);
         System.out.println("rate before " + inflationRate);
-        inflationRate = 0.1 * Math.exp(0.417 + 0.32 * Math.log(inflationRate) + 0.1 * randomVals[1]);
+        inflationRate = 0.000383 + 0.982335 * inflationRate + Math.pow(0.03, 2.0) * randomVals[1]; //TODO: remove magic numbers
         System.out.println("rate after " + inflationRate);
     }
 
