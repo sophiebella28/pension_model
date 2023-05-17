@@ -107,26 +107,6 @@ public class PensionFund extends Agent<MyModel.Globals> {
                         // 3. take difference
                         double requiredFunds = Math.max(liabilityFutureValue - portfolioFutureValue, 0.0); // if we will have more money than needed we just keep the bond so we can have more money
                         // 4. buy bonds that will give us the difference
-                        System.out.println("Working Directory = " + System.getProperty("user.dir"));
-                        ProcessBuilder processBuilder = new ProcessBuilder("/home/sophie/Documents/uni/project/git_folder/bash/activate_run_python.sh");
-                        processBuilder.redirectErrorStream(true);
-
-                        Process process = null;
-                        try {
-                            process = processBuilder.start();
-                            String results = IOUtils.toString(process.getInputStream(), "UTF-8");
-                            System.out.println(results);
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                            throw new RuntimeException(e);
-                        }
-                        try {
-                            int exitCode = process.waitFor();
-                            System.out.println(exitCode);
-                        } catch (InterruptedException e) {
-                            throw new RuntimeException(e);
-                        }
-
                         double currentPriceOfRequiredFunds = requiredFunds * Math.pow(1 + pensionFund.currentInterestRate, - (liability.dueDate - time));
                         // This calculates the amount of bonds we need to buy now with current interest rates
                         Bond newBond = new InterestBond(liability.dueDate, pensionFund.currentInterestRate, currentPriceOfRequiredFunds);
