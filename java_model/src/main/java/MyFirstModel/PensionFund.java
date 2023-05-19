@@ -29,6 +29,9 @@ public class PensionFund extends Agent<MyModel.Globals> {
     private double currentInterestRate;
     private double currentInflationRate;
 
+    private double currentDuration;
+
+    private double currentValue;
     private List<Bond> portfolio;
     private final List<Liability> liabilities;
     public PensionFund() {
@@ -38,13 +41,27 @@ public class PensionFund extends Agent<MyModel.Globals> {
 
     private double valuePortfolioAtTime(double futureTime, double currentTime) {
         double totalValue = 0.0;
-        for (double i = currentTime; i <= futureTime; i++) { // TODO this will be a pain in the arse
+        for (double i = currentTime; i <= futureTime; i++) { // TODO this will be annoying
             for (Bond bond : portfolio) {
                 totalValue += bond.requestCouponPayments(i, currentInflationRate);
             }
         }
         return totalValue;
     }
+
+    private void calculatePortfolioValueAndDuration(double currentTime) {
+        double totalValue = 0.0;
+        double totalDuration = 0.0;
+        for (Bond bond : portfolio) {
+            double bondVal = bond.valueBond(currentInterestRate, currentTime, currentInflationRate);
+            totalValue += bondVal;
+            totalDuration += bondVal * bond.calculateDuration(currentTime, currentInterestRate, currentInflationRate);
+        }
+        currentValue = totalValue;
+        currentDuration = totalDuration / totalValue;
+    }
+
+
     private double totalLiabilitiesAtTime(double time) {
         return liabilities.stream().filter(liability -> liability.dueDate == time)
                 .map(liability -> liability.amount).mapToDouble(Double::doubleValue).sum();
@@ -102,19 +119,22 @@ public class PensionFund extends Agent<MyModel.Globals> {
                         // 2. work out value of portfolio if all coupons reinvested at current rate - reinvestment is really confusing, just work out how much cash
                         // I can't figure out how reinvestment works for the life of me so I am not bothering with it, this just works out how much money we will have in the future
                         // With the bonds that we currently own
-                        System.out.println("liability future value " +  liabilityFutureValue);
+                        System.out.println("liability future value " + liabilityFutureValue);
                         double portfolioFutureValue = pensionFund.valuePortfolioAtTime(liability.dueDate, time) + pensionFund.cashVal;
                         // 3. take difference
                         double requiredFunds = Math.max(liabilityFutureValue - portfolioFutureValue, 0.0); // if we will have more money than needed we just keep the bond so we can have more money
                         // 4. buy bonds that will give us the difference
                         System.out.println("Working Directory = " + System.getProperty("user.dir"));
-                        ProcessBuilder processBuilder = new ProcessBuilder("/home/sophie/Documents/uni/project/git_folder/bash/activate_run_python.sh");
+                        pensionFund.calculatePortfolioValueAndDuration(time);
+                        double length = time - liability.dueDate;
+                        ProcessBuilder processBuilder = new ProcessBuilder("/home/sophie/Documents/uni/project/git_folder/bash/activate_run_python.sh", Double.toString(pensionFund.currentInterestRate),
+                                Double.toString(pensionFund.currentInflationRate), Double.toString(pensionFund.currentDuration), Double.toString(length), Double.toString(pensionFund.currentValue), Double.toString(liability.amount));
                         processBuilder.redirectErrorStream(true);
-
                         Process process = null;
+                        String results;
                         try {
                             process = processBuilder.start();
-                            String results = IOUtils.toString(process.getInputStream(), "UTF-8");
+                            results = IOUtils.toString(process.getInputStream(), "UTF-8");
                             System.out.println(results);
                         } catch (IOException e) {
                             e.printStackTrace();
@@ -126,14 +146,19 @@ public class PensionFund extends Agent<MyModel.Globals> {
                         } catch (InterruptedException e) {
                             throw new RuntimeException(e);
                         }
-
-                        double currentPriceOfRequiredFunds = requiredFunds * Math.pow(1 + pensionFund.currentInterestRate, - (liability.dueDate - time));
+                        String[] resultsArray = results.split(",");
+                        double requiredLength = Double.parseDouble(resultsArray[0]);
+                        double requiredAmount = Double.parseDouble(resultsArray[1]);
                         // This calculates the amount of bonds we need to buy now with current interest rates
-                        Bond newBond = new InterestBond(liability.dueDate, pensionFund.currentInterestRate, currentPriceOfRequiredFunds);
-                        pensionFund.getLinks(Links.MarketLink.class).send(Messages.PurchaseBonds.class, (msg, link) -> {
-                            msg.bondToPurchase = newBond;
-                        });
-                        pensionFund.portfolio.add(newBond);
+                        if (requiredAmount > 1e-06) { // adds a small amount of tolerance
+                            System.out.println("required Length: " + requiredLength);
+                            System.out.println((int) Math.round(requiredLength));
+                            Bond newBond = new InterestBond(time + Math.round(requiredLength), pensionFund.currentInterestRate, requiredAmount);
+                            pensionFund.getLinks(Links.MarketLink.class).send(Messages.PurchaseBonds.class, (msg, link) -> {
+                                msg.bondToPurchase = newBond;
+                            });
+                            pensionFund.portfolio.add(newBond);
+                        } // TODO: I also need to make sure that the fund sells all their bonds when they need to meet the liability
                     }
             );
         });
