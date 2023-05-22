@@ -22,12 +22,10 @@ public class IndexBond implements Bond {
 
     @Override
     public double requestCouponPayments(double time, double currentCPI) {
-        if (time == endTime) {
+        if (time >= endTime) {
             return couponRate * currentCPI / initialCPI * faceValue + faceValue;
-        } else if (time < endTime) {
-            return couponRate * currentCPI / initialCPI * faceValue;
         } else {
-            return 0.0; // TODO: this is kinda inefficient
+            return couponRate * currentCPI / initialCPI * faceValue;
         }
     }
 

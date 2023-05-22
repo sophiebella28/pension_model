@@ -15,6 +15,8 @@ from scipy.optimize import minimize
 
 # We assume that the ytm is equal to the coupon rate, which will be the current interest rate for regular bonds and maybe the same for the index linked ones?
 def duration(length, ytm, coupon_rate):
+    if (length < 1e-06 or length > 30):
+        return 0
     return (1 + ytm)/ytm - (1 + ytm + length * (coupon_rate - ytm))/(coupon_rate * ((1 + ytm)**length - 1) + ytm)
 
 # This is my function to minimize
@@ -69,13 +71,13 @@ def duration_minimization(optimised_vals, curr_interest_rate, curr_inflation_rat
 def test_func(x, *args):
     return x[0] * x[1]
 
-x0 = [1.0,100]
 curr_interest_rate = float(sys.argv[1])
 curr_inflation_rate = float(sys.argv[2])
 curr_duration = float(sys.argv[3])
 target_duration = float(sys.argv[4])
 curr_portfolio_val = float(sys.argv[5])
 curr_liability_val = float(sys.argv[6])
+x0 = [target_duration, abs(curr_portfolio_val - curr_liability_val)]
 optimization = minimize(duration_minimization, x0, args=(curr_interest_rate, curr_inflation_rate, curr_duration, target_duration, curr_portfolio_val, curr_liability_val), tol=1e-06,
                 constraints=({'type': 'eq', 'args': (curr_portfolio_val, curr_liability_val),
                                'fun': lambda inputs, curr_portfolio_val, curr_liability_val : inputs[1] + curr_portfolio_val - curr_liability_val},
@@ -85,7 +87,7 @@ optimization = minimize(duration_minimization, x0, args=(curr_interest_rate, cur
                               'fun': lambda inputs : inputs[0] - 1.0},
                              {'type': 'ineq',
                               'fun': lambda inputs : -(inputs[0] - 30.0)}
-                            ))
+                            ), method="SLSQP")
 
 min_vals = optimization.x
 length = min_vals[0]

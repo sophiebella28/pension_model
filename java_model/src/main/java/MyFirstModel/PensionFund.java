@@ -10,27 +10,21 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.stream.Collectors;
 
 public class PensionFund extends Agent<MyModel.Globals> {
     @Variable
     public double cashVal;
-
-    @Variable
-    // Currently we assume that this never changes - the pension scheme needs to pay the same amount of money every tick forever
-
-//    @Variable
-//    public double fixedBondsVal;
-//
-//    @Variable
-//    public double indexBondsVal;
-
-
     private double currentInterestRate;
     private double currentInflationRate;
 
+    @Variable
+    private double currentLiabilityVal;
+
     private double currentDuration;
 
+    @Variable
     private double currentValue;
     private List<Bond> portfolio;
     private final List<Liability> liabilities;
@@ -53,12 +47,22 @@ public class PensionFund extends Agent<MyModel.Globals> {
         double totalValue = 0.0;
         double totalDuration = 0.0;
         for (Bond bond : portfolio) {
+            System.out.println("in bond loop" + currentInterestRate + " inflation " + currentInflationRate);
             double bondVal = bond.valueBond(currentInterestRate, currentTime, currentInflationRate);
+            System.out.println("bond val" + bondVal);
             totalValue += bondVal;
             totalDuration += bondVal * bond.calculateDuration(currentTime, currentInterestRate, currentInflationRate);
         }
-        currentValue = totalValue;
-        currentDuration = totalDuration / totalValue;
+        if (portfolio.size() > 0) {
+            currentValue = totalValue;
+            currentDuration = totalDuration / totalValue;
+        } else {
+            currentValue = 0.0;
+            currentDuration = 0.0;
+        }
+
+        System.out.println("current value is" + currentValue);
+
     }
 
 
@@ -66,11 +70,29 @@ public class PensionFund extends Agent<MyModel.Globals> {
         return liabilities.stream().filter(liability -> liability.dueDate == time)
                 .map(liability -> liability.amount).mapToDouble(Double::doubleValue).sum();
     }
+
+
+
     public static Action<PensionFund> payLiabilities(double time) {
       return Action.create(PensionFund.class, pensionFund -> {
-          pensionFund.cashVal -= pensionFund.totalLiabilitiesAtTime(time);
-          pensionFund.liabilities.removeIf(liability -> liability.dueDate <= time);
-          // removes liabilities from the list once they have been paid
+          double totalLiabilities = pensionFund.totalLiabilitiesAtTime(time);
+          System.out.println();
+              ListIterator<Bond> iterator = pensionFund.portfolio.listIterator();
+              // If the pension fund can't pay the liability, sell bonds until either it can pay or there are no more bonds
+              while (pensionFund.cashVal < totalLiabilities && iterator.hasNext()) {
+                  Bond bond = iterator.next();
+                  double bondVal = bond.valueBond(pensionFund.currentInterestRate, time, pensionFund.currentInflationRate);
+                  pensionFund.cashVal += bondVal;
+                  pensionFund.getLinks(Links.MarketLink.class).send(Messages.SellBonds.class, (msg, link) ->
+                  {
+                      msg.bondToSell = bond;
+                      msg.bondVal = bondVal;
+                  });
+                  iterator.remove();
+              }
+              pensionFund.cashVal -= totalLiabilities;
+              pensionFund.liabilities.removeIf(liability -> liability.dueDate <= time);
+
             });
     }
     public static Action<PensionFund> receiveCoupons(double time) {
@@ -89,6 +111,7 @@ public class PensionFund extends Agent<MyModel.Globals> {
             pensionFund.currentInterestRate = rates[0];
             pensionFund.currentInflationRate = rates[1]; // extract the rates out of the message object
             pensionFund.liabilities.forEach(liability -> liability.updateLiabilityAmount(pensionFund.currentInflationRate)); // TODO check this works
+            pensionFund.currentLiabilityVal = pensionFund.liabilities.stream().map(liability -> liability.amount).reduce(Double::sum).orElse(0.0);
         });
     }
 
@@ -119,16 +142,18 @@ public class PensionFund extends Agent<MyModel.Globals> {
                         // 2. work out value of portfolio if all coupons reinvested at current rate - reinvestment is really confusing, just work out how much cash
                         // I can't figure out how reinvestment works for the life of me so I am not bothering with it, this just works out how much money we will have in the future
                         // With the bonds that we currently own
-                        System.out.println("liability future value " + liabilityFutureValue);
                         double portfolioFutureValue = pensionFund.valuePortfolioAtTime(liability.dueDate, time) + pensionFund.cashVal;
                         // 3. take difference
                         double requiredFunds = Math.max(liabilityFutureValue - portfolioFutureValue, 0.0); // if we will have more money than needed we just keep the bond so we can have more money
                         // 4. buy bonds that will give us the difference
-                        System.out.println("Working Directory = " + System.getProperty("user.dir"));
                         pensionFund.calculatePortfolioValueAndDuration(time);
-                        double length = time - liability.dueDate;
+                        System.out.println(pensionFund.portfolio.stream().map(Bond::getEndTime).collect(Collectors.toList()));
+                        double length = liability.dueDate - time;
+                        System.out.println("/home/sophie/Documents/uni/project/git_folder/bash/activate_run_python.sh" + " " + Double.toString(pensionFund.currentInterestRate) + " " +
+                                Double.toString(pensionFund.currentInflationRate) + " " + Double.toString(pensionFund.currentDuration) + " " + Double.toString(length) + " " + Double.toString(pensionFund.currentValue + pensionFund.cashVal) + " " + Double.toString(liability.amount));
+
                         ProcessBuilder processBuilder = new ProcessBuilder("/home/sophie/Documents/uni/project/git_folder/bash/activate_run_python.sh", Double.toString(pensionFund.currentInterestRate),
-                                Double.toString(pensionFund.currentInflationRate), Double.toString(pensionFund.currentDuration), Double.toString(length), Double.toString(pensionFund.currentValue), Double.toString(liability.amount));
+                                Double.toString(pensionFund.currentInflationRate), Double.toString(pensionFund.currentDuration), Double.toString(length), Double.toString(pensionFund.currentValue + pensionFund.cashVal), Double.toString(liability.amount));
                         processBuilder.redirectErrorStream(true);
                         Process process = null;
                         String results;
@@ -142,7 +167,7 @@ public class PensionFund extends Agent<MyModel.Globals> {
                         }
                         try {
                             int exitCode = process.waitFor();
-                            System.out.println(exitCode);
+                            System.out.println("exit code" + exitCode);
                         } catch (InterruptedException e) {
                             throw new RuntimeException(e);
                         }

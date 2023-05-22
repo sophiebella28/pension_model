@@ -79,7 +79,7 @@ public class MyModel extends AgentBasedModel<MyModel.Globals> {
         getGlobals().time = getContext().getTick() * getGlobals().timeStep;
         Sequence payCoupons = Sequence.create(BondIssuer.giveCoupons(getGlobals().time), PensionFund.receiveCoupons(getGlobals().time)); // TODO: look into whether I can access time non statically
         // pays coupons to bond holders
-        Sequence payLiabilities = Sequence.create(PensionFund.payLiabilities(getGlobals().time));
+        Sequence payLiabilities = Sequence.create(PensionFund.payLiabilities(getGlobals().time), BondIssuer.receiveSoldBonds());
         // pension fund pays its liabilities
         Sequence updateInterest = Sequence.create(BondIssuer.updateInterest(getGlobals().thetas[(int) Math.round(getGlobals().time)]), PensionFund.receiveInterestRates());
         Sequence performHedges = Sequence.create(PensionFund.buyHedges(getGlobals().time, getGlobals().timeStep), BondIssuer.receiveHedges());

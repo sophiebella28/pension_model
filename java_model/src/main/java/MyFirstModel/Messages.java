@@ -14,4 +14,9 @@ public class Messages {
     public static class PurchaseBonds extends Message {
         public Bond bondToPurchase;
     }
+
+    public static class SellBonds extends Message {
+        public Bond bondToSell;
+        public double bondVal;
+    }
 }

@@ -30,12 +30,10 @@ public class InterestBond implements Bond{
     @Override
     public double requestCouponPayments(double time, double currentCPI) {
         // current CPI is unused in this function but it makes it easier to have it there - fix maybe later idk
-        if (time == endTime) {
+        if (time >= endTime) {
             return faceValue + rate * faceValue;
-        } else if (time < endTime) {
-            return rate * faceValue;
         } else {
-            return 0.0; // TODO: this is kinda inefficient - do this check elsewhere
+            return rate * faceValue;
         }
     }
 
