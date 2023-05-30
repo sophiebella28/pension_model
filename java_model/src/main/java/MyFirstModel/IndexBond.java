@@ -21,6 +21,11 @@ public class IndexBond implements Bond {
     }
 
     @Override
+    public double getFaceValue() {
+        return faceValue;
+    }
+
+    @Override
     public double requestCouponPayments(double time, double currentCPI) {
         if (time >= endTime) {
             return couponRate * currentCPI / initialCPI * faceValue + faceValue;

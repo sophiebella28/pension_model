@@ -27,6 +27,9 @@ public class InterestBond implements Bond{
     public double getEndTime() {
         return endTime;
     }
+
+    @Override
+    public double getFaceValue() { return faceValue; }
     @Override
     public double requestCouponPayments(double time, double currentCPI) {
         // current CPI is unused in this function but it makes it easier to have it there - fix maybe later idk
