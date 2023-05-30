@@ -1,12 +1,13 @@
 
-import MyFirstModel.MyModel;
+import PensionFundModel.MyModel;
 import simudyne.nexus.Server;
 
 public class Main {
   public static void main(String[] args) {
 
-    Server.register("My First Model", MyModel.class);
+    Server.register("Pension Fund Model", MyModel.class);
 
     Server.run(args);
   }
+
 }
