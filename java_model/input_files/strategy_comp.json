@@ -1,0 +1,12 @@
+{
+  "runs": 2,
+  "seeds": [123,234],
+  "nmDurationPensionFunds": 1,
+  "nmValuePensionFunds": 1,
+  "timeStep": 1,
+  "driftShortTerm": 0.02,
+  "volatilityShortTerm": 0.001,
+  "scenarioData": {
+    "4" : {}
+  }
+}
