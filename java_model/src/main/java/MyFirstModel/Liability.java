@@ -15,10 +15,6 @@ public class Liability {
     }
 
     public double valueLiability(double forecastedCPI, double time) {
-        System.out.println("amount " + amount);
-        System.out.println("power " + Math.min(1.0 + forecastedCPI, 1.05));
-        System.out.println("forecastedCPI " + forecastedCPI);
-
         return amount * Math.pow(Math.min(1.0 + forecastedCPI, 1.05), dueDate - time);
 
     }

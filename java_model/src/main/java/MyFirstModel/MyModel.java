@@ -7,6 +7,8 @@ import simudyne.core.abm.Group;
 import simudyne.core.abm.Sequence;
 import simudyne.core.annotations.Input;
 
+import javax.ws.rs.GET;
+
 //This is your main model class where you define the components of your model, including the GlobalState, setup, and step.
 public class MyModel extends AgentBasedModel<MyModel.Globals> {
 
@@ -18,8 +20,12 @@ public class MyModel extends AgentBasedModel<MyModel.Globals> {
     // - DB of pension fund - get rid of later but good for now
     // - DB time period or something?????????????
     // Number of pension funds
-    @Input(name = "Number of Pension Funds")
-    public int nmPensionFunds = 1;
+    @Input(name = "Number of Duration Matching Funds")
+    public int nmDurationPensionFunds = 1;
+
+    @Input(name = "Number of Value Matching Funds")
+    public int nmValuePensionFunds = 1;
+
     public double time;
     @Input(name = "Time Step in ticks")
     public long timeStep = 1;
@@ -57,16 +63,14 @@ public class MyModel extends AgentBasedModel<MyModel.Globals> {
         // - controller of interest rates or something idk - maybe this stays in the bond controller
 
         // Generates given number of pension funds
-        Group<PensionFund> pensionFundGroup = generateGroup(PensionFund.class, getGlobals().nmPensionFunds);
-
+        Group<PensionFund> durationPensionFundGroup = generateGroup(PensionFund.class, getGlobals().nmDurationPensionFunds, agent -> {agent.strategy = Strategy.DURATION_MATCHING;});
+        Group<PensionFund> valuePensionFundGroup = generateGroup(PensionFund.class, getGlobals().nmValuePensionFunds, agent -> {agent.strategy = Strategy.VALUE_MATCHING;});
         Group<BondIssuer> bondIssuerGroup = generateGroup(BondIssuer.class, 1);
-
         // Fully connects pension funds with bond issuer
-        pensionFundGroup.fullyConnected(bondIssuerGroup, Links.MarketLink.class);
-
-        bondIssuerGroup.fullyConnected(pensionFundGroup, Links.MarketLink.class);
-
-
+        durationPensionFundGroup.fullyConnected(bondIssuerGroup, Links.MarketLink.class);
+        bondIssuerGroup.fullyConnected(durationPensionFundGroup, Links.MarketLink.class);
+        valuePensionFundGroup.fullyConnected(bondIssuerGroup, Links.MarketLink.class);
+        bondIssuerGroup.fullyConnected(valuePensionFundGroup, Links.MarketLink.class);
         super.setup();
     }
 
@@ -74,12 +78,13 @@ public class MyModel extends AgentBasedModel<MyModel.Globals> {
     // Actions can be standalone in a run sequence or contain message passing phases.
     @Override
     public void step() {
+        System.out.println("NEW STEP, time = " + getGlobals().time);
         super.step();
         // a time variable so that current tick doesnt need to be passed around - hasnt been fully refactored into the code
         getGlobals().time = getContext().getTick() * getGlobals().timeStep;
         Sequence payCoupons = Sequence.create(BondIssuer.giveCoupons(getGlobals().time), PensionFund.receiveCoupons(getGlobals().time)); // TODO: look into whether I can access time non statically
         // pays coupons to bond holders
-        Sequence payLiabilities = Sequence.create(PensionFund.payLiabilities(getGlobals().time));
+        Sequence payLiabilities = Sequence.create(PensionFund.payLiabilities(getGlobals().time), BondIssuer.receiveSoldBonds());
         // pension fund pays its liabilities
         Sequence updateInterest = Sequence.create(BondIssuer.updateInterest(getGlobals().thetas[(int) Math.round(getGlobals().time)]), PensionFund.receiveInterestRates());
         Sequence performHedges = Sequence.create(PensionFund.buyHedges(getGlobals().time, getGlobals().timeStep), BondIssuer.receiveHedges());
@@ -94,9 +99,13 @@ public class MyModel extends AgentBasedModel<MyModel.Globals> {
         //
         // + buy the necessary instruments
         //     from the government
+        System.out.println("pay coupons");
         run(payCoupons);
+        System.out.println("pay liabilities");
         run(payLiabilities);
+        System.out.println("update interest");
         run(updateInterest);
+        System.out.println("perform hedges");
         run(performHedges);
 
 

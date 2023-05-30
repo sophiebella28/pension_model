@@ -12,26 +12,39 @@ public class InterestBond implements Bond{
         this.faceValue = faceValue;
     }
 
-    public double getValueAtNextTimestep(double time) {
-        return (1.05) * faceValue; // this is useless rn
+    @Override
+    public double valueBond(double currentRate, double currentTime, double currentCPI) {
+        int length = (int) Math.round(endTime - currentTime);
+        double price = 0.0;
+        for (int i = 1; i < length; i++) {
+            price += (rate * faceValue) / Math.pow(1 + currentRate, i);
+        }
+        price += (rate * faceValue + faceValue) / Math.pow(1 + currentRate, length);
+        return price;
     }
 
     @Override
     public double getEndTime() {
         return endTime;
     }
+
+    @Override
+    public double getFaceValue() { return faceValue; }
     @Override
     public double requestCouponPayments(double time, double currentCPI) {
         // current CPI is unused in this function but it makes it easier to have it there - fix maybe later idk
-        if (time == endTime) {
+        if (time >= endTime) {
             return faceValue + rate * faceValue;
-        } else if (time < endTime) {
-            return rate * faceValue;
         } else {
-            return 0.0; // TODO: this is kinda inefficient - do this check elsewhere
+            return rate * faceValue;
         }
     }
 
+    @Override
+    public double calculateDuration(double currentTime, double currentInterestRate, double currentCPI) {
+        int length = (int) Math.round(endTime - currentTime);
+        return (1 + currentInterestRate) / currentInterestRate - (1 + currentInterestRate + length * (rate - currentInterestRate)) / (rate * (Math.pow(1 + currentInterestRate, length - 1)) + currentInterestRate);
+    }
     // make an interface which is bond or something and make it have an evaluate fn
     // and then loop over it and call value on everything in the list so thats easy
     // except it might not be easy to value the index bond
