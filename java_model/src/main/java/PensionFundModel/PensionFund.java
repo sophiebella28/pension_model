@@ -15,17 +15,18 @@ public class PensionFund extends Agent<MyModel.Globals> {
     private double currentInterestRate;
     private double currentInflationRate;
 
-    // @Variable
+    @Variable
     public double currentLiabilityVal;
-
+    @Variable
     private double currentDuration;
 
-    // @Variable
+    @Variable
     public double currentValue;
     private List<Bond> portfolio;
     private final List<Liability> liabilities;
 
-    public Strategy strategy;
+    @Variable
+    public String strategy;
 
     public PensionFund() {
         this.portfolio = new ArrayList<Bond>();
@@ -60,7 +61,6 @@ public class PensionFund extends Agent<MyModel.Globals> {
     public static Action<PensionFund> payLiabilities(double time) {
       return Action.create(PensionFund.class, pensionFund -> {
           double totalLiabilities = pensionFund.totalLiabilitiesAtTime(time);
-          System.out.println("total liabilities: " + totalLiabilities);
           ListIterator<Bond> iterator = pensionFund.portfolio.listIterator();
           // If the pension fund can't pay the liability, sell bonds until either it can pay or there are no more bonds
           while (pensionFund.cashVal < totalLiabilities && iterator.hasNext()) {
@@ -72,7 +72,6 @@ public class PensionFund extends Agent<MyModel.Globals> {
                   msg.bondToSell = bond;
                   msg.bondVal = bondVal;
               });
-              System.out.println("Sold bond of value " + bondVal);
               iterator.remove();
           }
           pensionFund.cashVal -= totalLiabilities;
@@ -85,7 +84,6 @@ public class PensionFund extends Agent<MyModel.Globals> {
         return Action.create(PensionFund.class, pensionFund -> {
             double totalCoupons = pensionFund.getMessagesOfType(Messages.CouponPayment.class).stream()
                     .map(coupon -> coupon.coupons).findFirst().orElse(0.0);
-
             pensionFund.cashVal += totalCoupons;
             pensionFund.portfolio.removeIf(bond -> bond.getEndTime() <= time);
         });
@@ -126,9 +124,9 @@ public class PensionFund extends Agent<MyModel.Globals> {
                         //TODO THIS WONT WORK AS SOON!!!!! AS SOON AS I HAVE MORE THAN ONE LIABILITY
                         pensionFund.calculatePortfolioValueAndDuration(time);
                         double length = liability.dueDate - time;
-                        System.out.println("/home/sophie/Documents/uni/project/git_folder/bash/activate_run_python.sh" + " " + Double.toString(pensionFund.currentInterestRate) + " " +
-                                Double.toString(pensionFund.currentInflationRate) + " " + Double.toString(pensionFund.currentDuration) + " " + Double.toString(length) + " "
-                                + Double.toString(pensionFund.currentValue) + " " + Double.toString(liability.amount) + " " + Double.toString(pensionFund.cashVal) + " " + pensionFund.strategy.toString());
+//                        System.out.println("/home/sophie/Documents/uni/project/git_folder/bash/activate_run_python.sh" + " " + Double.toString(pensionFund.currentInterestRate) + " " +
+//                                Double.toString(pensionFund.currentInflationRate) + " " + Double.toString(pensionFund.currentDuration) + " " + Double.toString(length) + " "
+//                                + Double.toString(pensionFund.currentValue) + " " + Double.toString(liability.amount) + " " + Double.toString(pensionFund.cashVal) + " " + pensionFund.strategy.toString());
 
                         ProcessBuilder processBuilder = new ProcessBuilder("/home/sophie/Documents/uni/project/git_folder/bash/activate_run_python.sh", Double.toString(pensionFund.currentInterestRate),
                                 Double.toString(pensionFund.currentInflationRate), Double.toString(pensionFund.currentDuration), Double.toString(length), Double.toString(pensionFund.currentValue),
@@ -139,32 +137,35 @@ public class PensionFund extends Agent<MyModel.Globals> {
                         try {
                             process = processBuilder.start();
                             results = IOUtils.toString(process.getInputStream(), "UTF-8");
-                            System.out.println("results:" + results);
                         } catch (IOException e) {
                             e.printStackTrace();
                             throw new RuntimeException(e);
                         }
+                        int exitCode;
                         try {
-                            int exitCode = process.waitFor();
+                            exitCode = process.waitFor();
                         } catch (InterruptedException e) {
                             throw new RuntimeException(e);
                         }
-                        String[] resultsArray = results.split(",");
-                        double requiredLength = Double.parseDouble(resultsArray[0]);
-                        double requiredAmount = Double.parseDouble(resultsArray[1]);
-                        // This calculates the amount of bonds we need to buy now with current interest rates
-                        if (requiredAmount > 1e-06) { // adds a small amount of tolerance
-                            System.out.println("Current cash amount: " + pensionFund.cashVal);
-                            System.out.println("Purchasing Bond for: " + requiredAmount);
-                            Bond newBond = new InterestBond(time + Math.round(requiredLength), pensionFund.currentInterestRate, requiredAmount);
-                            pensionFund.cashVal -= requiredAmount;
-                            pensionFund.getLinks(Links.MarketLink.class).send(Messages.PurchaseBonds.class, (msg, link) -> {
-                                msg.bondToPurchase = newBond;
-                            });
-                            pensionFund.portfolio.add(newBond);
+                        if (exitCode == 0) {
+                            String[] resultsArray = results.split(",");
+                            double requiredLength = Double.parseDouble(resultsArray[0]);
+                            double requiredAmount = Double.parseDouble(resultsArray[1]);
+                            // This calculates the amount of bonds we need to buy now with current interest rates
+                            if (requiredAmount > 1e-06) { // adds a small amount of tolerance
+//                                System.out.println("Current cash amount: " + pensionFund.cashVal);
+//                                System.out.println("Purchasing Bond for: " + requiredAmount);
+                                Bond newBond = new InterestBond(time + Math.round(requiredLength), pensionFund.currentInterestRate, requiredAmount);
+                                pensionFund.cashVal -= requiredAmount;
+                                pensionFund.getLinks(Links.MarketLink.class).send(Messages.PurchaseBonds.class, (msg, link) -> {
+                                    msg.bondToPurchase = newBond;
+                                });
+                                pensionFund.portfolio.add(newBond);
+                            }
+                            pensionFund.calculatePortfolioValueAndDuration(time); // Updates current value with the new bond todo can probably optimise this
+//                            System.out.println("bond end times: " + pensionFund.portfolio.stream().map(Bond::getEndTime).collect(Collectors.toList()));
                         }
-                        pensionFund.calculatePortfolioValueAndDuration(time); // Updates current value with the new bond todo can probably optimise this
-                        System.out.println("bond end times: " + pensionFund.portfolio.stream().map(Bond::getEndTime).collect(Collectors.toList()));
+
                     }
             );
         });

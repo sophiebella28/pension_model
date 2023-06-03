@@ -6,8 +6,17 @@ import simudyne.core.abm.Group;
 import simudyne.core.abm.Sequence;
 import simudyne.core.annotations.Input;
 
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
 //This is your main model class where you define the components of your model, including the GlobalState, setup, and step.
 public class MyModel extends AgentBasedModel<MyModel.Globals> {
+
+    private static final String COMMA_DELIMITER = ",";
 
     //Globals stores all of your variables and data structures that you want your agents to be able to access
     //Store information here that is system-level knowledge (ie - # of Agents or static variables)
@@ -33,14 +42,10 @@ public class MyModel extends AgentBasedModel<MyModel.Globals> {
     @Input(name = "Volatility Short Term Interest Rates")
     public double volatilityShortTerm = 0.001;
 
+    @Input(name = "Select Theta Curve")
+    public boolean useDownwardCurve = false;
 
-    public double[] thetas = {-0.09592369, -0.06244385, -0.03235271, -0.00548885,  0.01830917,  0.03920281,
-                0.0573535,   0.07292267,  0.08607178,  0.09696226,  0.10575556,  0.11261311,
-                0.11769636,  0.12116674,  0.1231857,   0.12391468,  0.12351512,  0.12214847,
-                0.11997615,  0.11715962,  0.11386031,  0.11023967,  0.10645913,  0.10268015,
-                0.09906415,  0.09577258,  0.09296688,  0.09080849,  0.08945885,  0.08907941,
-                0.08983161,  0.09187688,  0.09537666,  0.10049241,  0.10738555,  0.11621753,
-                0.1271498,   0.14034378,  0.15596093, 0.17416268};
+    public List<Double> thetas = new ArrayList<>();
 
 
 }
@@ -54,14 +59,30 @@ public class MyModel extends AgentBasedModel<MyModel.Globals> {
     //Define your agent groups and connections in the setup. This is where the environment and agents are generated
     @Override
     public void setup() {
+        String thetaFileName;
+        if (getGlobals().useDownwardCurve) {
+            thetaFileName = "downward_curve.csv";
+        } else {
+            thetaFileName = "upward_curve.csv";
+        }
+
+        try (BufferedReader br = new BufferedReader(new FileReader("input_files" + thetaFileName))) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                String[] values = line.split(COMMA_DELIMITER);
+                getGlobals().thetas.add(Double.parseDouble(line));
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
         // Types of agent
         // - pension fund
         // - bond controller
         // - controller of interest rates or something idk - maybe this stays in the bond controller
 
         // Generates given number of pension funds
-        Group<PensionFund> durationPensionFundGroup = generateGroup(PensionFund.class, getGlobals().nmDurationPensionFunds, agent -> {agent.strategy = Strategy.DURATION_MATCHING;});
-        Group<PensionFund> valuePensionFundGroup = generateGroup(PensionFund.class, getGlobals().nmValuePensionFunds, agent -> {agent.strategy = Strategy.VALUE_MATCHING;});
+        Group<PensionFund> durationPensionFundGroup = generateGroup(PensionFund.class, getGlobals().nmDurationPensionFunds, agent -> {agent.strategy = Strategy.DURATION_MATCHING.toString();});
+        Group<PensionFund> valuePensionFundGroup = generateGroup(PensionFund.class, getGlobals().nmValuePensionFunds, agent -> {agent.strategy = Strategy.VALUE_MATCHING.toString();});
         Group<BondIssuer> bondIssuerGroup = generateGroup(BondIssuer.class, 1);
         // Fully connects pension funds with bond issuer
         durationPensionFundGroup.fullyConnected(bondIssuerGroup, Links.MarketLink.class);
@@ -75,7 +96,7 @@ public class MyModel extends AgentBasedModel<MyModel.Globals> {
     // Actions can be standalone in a run sequence or contain message passing phases.
     @Override
     public void step() {
-        System.out.println("NEW STEP, time = " + getGlobals().time);
+        // System.out.println("NEW STEP, time = " + getGlobals().time);
         super.step();
         // a time variable so that current tick doesnt need to be passed around - hasnt been fully refactored into the code
         getGlobals().time = getContext().getTick() * getGlobals().timeStep;
@@ -83,7 +104,7 @@ public class MyModel extends AgentBasedModel<MyModel.Globals> {
         // pays coupons to bond holders
         Sequence payLiabilities = Sequence.create(PensionFund.payLiabilities(getGlobals().time), BondIssuer.receiveSoldBonds());
         // pension fund pays its liabilities
-        Sequence updateInterest = Sequence.create(BondIssuer.updateInterest(getGlobals().thetas[(int) Math.round(getGlobals().time)]), PensionFund.receiveInterestRates());
+        Sequence updateInterest = Sequence.create(BondIssuer.updateInterest(getGlobals().thetas.get((int) Math.round(getGlobals().time))), PensionFund.receiveInterestRates());
         Sequence performHedges = Sequence.create(PensionFund.buyHedges(getGlobals().time, getGlobals().timeStep), BondIssuer.receiveHedges());
         //
         // 1. government gives funds their interest + whatever values they're owed depending on bonds
@@ -96,13 +117,13 @@ public class MyModel extends AgentBasedModel<MyModel.Globals> {
         //
         // + buy the necessary instruments
         //     from the government
-        System.out.println("pay coupons");
+        //System.out.println("pay coupons");
         run(payCoupons);
-        System.out.println("pay liabilities");
+        //System.out.println("pay liabilities");
         run(payLiabilities);
-        System.out.println("update interest");
+        //System.out.println("update interest");
         run(updateInterest);
-        System.out.println("perform hedges");
+        //System.out.println("perform hedges");
         run(performHedges);
 
 

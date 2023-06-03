@@ -9,10 +9,10 @@ import java.util.*;
 
 public class BondIssuer extends Agent<MyModel.Globals> {
 
-    // @Variable(initializable = true)
+    @Variable(initializable = true)
     public double interestRate = 0.02;
 
-    // @Variable(initializable = true)
+    @Variable(initializable = true)
     public double inflationRate = 0.02;
     @Variable(initializable = true)
     public double totalMoney = 0.0;
@@ -32,7 +32,6 @@ public class BondIssuer extends Agent<MyModel.Globals> {
                 } else {
                     bondIssuer.portfolios.put(purchaseBonds.getSender(), new ArrayList<>(Collections.singletonList(purchaseBonds.bondToPurchase)));
                 }
-                System.out.println("keyset:" + bondIssuer.portfolios.keySet());
                 bondIssuer.totalMoney += purchaseBonds.bondToPurchase.getFaceValue();
             });
         });
@@ -83,9 +82,11 @@ public class BondIssuer extends Agent<MyModel.Globals> {
                 });
             });}
     void updateRates(double theta) {
-        mvn = getPrng().multivariateNormal(new double[]{0.0, 0.0}, new double[][]{{1.0, 0.19}, {0.19, 1.0}}); // TODO this may no longer be random
+        mvn = getPrng().multivariateNormal(new double[]{0.0, 0.0}, new double[][]{{1.0, 0.19}, {0.19, 1.0}});
         double[] randomVals = mvn.sample();
-        interestRate += ( getGlobals().driftShortTerm ) * interestRate + getGlobals().volatilityShortTerm * randomVals[0];
+        System.out.println("Current theta: " + theta);
+        System.out.println(("Interest rate change: " + ( ( theta - getGlobals().driftShortTerm * interestRate)  + getGlobals().volatilityShortTerm * randomVals[0]) / 100.0));
+        interestRate += ( ( theta - getGlobals().driftShortTerm * interestRate)  + getGlobals().volatilityShortTerm * randomVals[0]);
         inflationRate = 0.000383 + 0.982335 * inflationRate + Math.pow(0.03, 2.0) * randomVals[1]; //TODO: remove magic numbers
     }
 

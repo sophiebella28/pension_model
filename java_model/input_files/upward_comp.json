@@ -3,8 +3,9 @@
   "nmDurationPensionFunds": 1,
   "nmValuePensionFunds": 1,
   "timeStep": 1,
-  "driftShortTerm": 0.02,
-  "volatilityShortTerm": 0.001,
+  "driftShortTerm": 0.05,
+  "volatilityShortTerm": 0.1,
+  "useDownwardCurve": false,
   "scenarioData": {
     "30" : {}
   }

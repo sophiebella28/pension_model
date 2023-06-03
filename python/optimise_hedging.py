@@ -15,6 +15,8 @@ def duration_minimization(optimised_vals, curr_interest_rate, curr_inflation_rat
     # finds the duration of the proposed bond
     duration_bond_to_buy = duration(length, curr_interest_rate, curr_interest_rate)
     # redoes weighted duration calculation over portfolio - I'm pretty sure this is actually wrong
+    if (amount + curr_portfolio_val < 1e-06):
+        return 0.0
     return abs(amount / (amount + curr_portfolio_val) * duration_bond_to_buy + curr_portfolio_val / (amount + curr_portfolio_val) * curr_duration - target_duration)
 
 def value_minimization(amount, curr_portfolio_val, curr_liability_val):
