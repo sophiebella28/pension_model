@@ -33,9 +33,12 @@ public class InterestBond implements Bond{
     @Override
     public double requestCouponPayments(double time, double currentCPI) {
         // current CPI is unused in this function but it makes it easier to have it there - fix maybe later idk
+//        System.out.println(("Current time is " + time + " end time of the bond is " + endTime + " face value is " + faceValue));
         if (time >= endTime) {
+//            System.out.println("Making final payment of " + (faceValue + rate * faceValue));
             return faceValue + rate * faceValue;
         } else {
+//            System.out.println("Making coupon payment of " + rate * faceValue);
             return rate * faceValue;
         }
     }
@@ -43,7 +46,8 @@ public class InterestBond implements Bond{
     @Override
     public double calculateDuration(double currentTime, double currentInterestRate, double currentCPI) {
         int length = (int) Math.round(endTime - currentTime);
-        return (1 + currentInterestRate) / currentInterestRate - (1 + currentInterestRate + length * (rate - currentInterestRate)) / (rate * (Math.pow(1 + currentInterestRate, length - 1)) + currentInterestRate);
+        return (1 + currentInterestRate) / currentInterestRate -
+                (1 + currentInterestRate + length * (rate - currentInterestRate)) / (rate * (Math.pow(1 + currentInterestRate, length) - 1) + currentInterestRate);
     }
     // make an interface which is bond or something and make it have an evaluate fn
     // and then loop over it and call value on everything in the list so thats easy

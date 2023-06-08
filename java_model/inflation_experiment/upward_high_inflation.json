@@ -1,0 +1,11 @@
+{
+  "runs": 50,
+  "scenarioData": {
+    "0" : {
+      "useDownwardCurve": false,
+      "initInterest": 0.03,
+      "initInflation": 0.05
+    },
+    "15" : {}
+  }
+}

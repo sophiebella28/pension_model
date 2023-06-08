@@ -9,11 +9,11 @@ import java.util.*;
 
 public class BondIssuer extends Agent<MyModel.Globals> {
 
-    @Variable(initializable = true)
-    public double interestRate = 0.02;
+    @Variable
+    public double interestRate;
 
-    @Variable(initializable = true)
-    public double inflationRate = 0.02;
+    @Variable
+    public double inflationRate;
     @Variable(initializable = true)
     public double totalMoney = 0.0;
 
@@ -78,16 +78,15 @@ public class BondIssuer extends Agent<MyModel.Globals> {
                 bondIssuer.updateRates(theta);
                 bondIssuer.getLinks(Links.MarketLink.class).send(Messages.InterestUpdate.class,
                         (msg, link) -> {
-                    msg.rates = new double[] {bondIssuer.interestRate, bondIssuer.inflationRate};
-                });
+                    msg.interestRate = bondIssuer.interestRate;
+                    msg.inflationRate = bondIssuer.inflationRate; }
+                );
             });}
     void updateRates(double theta) {
         mvn = getPrng().multivariateNormal(new double[]{0.0, 0.0}, new double[][]{{1.0, 0.19}, {0.19, 1.0}});
         double[] randomVals = mvn.sample();
-        System.out.println("Current theta: " + theta);
-        System.out.println(("Interest rate change: " + ( ( theta - getGlobals().driftShortTerm * interestRate)  + getGlobals().volatilityShortTerm * randomVals[0]) / 100.0));
         interestRate += ( ( theta - getGlobals().driftShortTerm * interestRate)  + getGlobals().volatilityShortTerm * randomVals[0]);
-        inflationRate = 0.000383 + 0.982335 * inflationRate + Math.pow(0.03, 2.0) * randomVals[1]; //TODO: remove magic numbers
+        inflationRate = 0.000383 + 0.982335 * inflationRate + 0.003 * randomVals[1]; //TODO: remove magic numbers
     }
 
 

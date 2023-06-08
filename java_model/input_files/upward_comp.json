@@ -1,12 +1,11 @@
 {
-  "runs": 1,
-  "nmDurationPensionFunds": 1,
-  "nmValuePensionFunds": 1,
-  "timeStep": 1,
-  "driftShortTerm": 0.05,
-  "volatilityShortTerm": 0.1,
-  "useDownwardCurve": false,
+  "runs": 50,
   "scenarioData": {
-    "30" : {}
+    "0" : {
+      "useDownwardCurve": false,
+      "initInterest": 0.03,
+      "initInflation": 0.02
+    },
+    "15" : {}
   }
 }

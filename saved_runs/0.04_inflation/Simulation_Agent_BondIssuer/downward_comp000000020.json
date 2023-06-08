@@ -1,0 +1,8 @@
+[
+{"_id":4,"inflationRate":0.02,"totalMoney":0.0,"tick":0,"time":"2018-01-01T00:00Z","interestRate":0.05},
+{"_id":4,"inflationRate":0.014060676396557597,"totalMoney":12000.0,"tick":1,"time":"2018-02-01T00:00Z","interestRate":0.04830150136263593},
+{"_id":4,"inflationRate":0.010451498914336176,"totalMoney":11667.81986193997,"tick":2,"time":"2018-03-01T00:00Z","interestRate":0.045861968235182377},
+{"_id":4,"inflationRate":0.012385328258629105,"totalMoney":10974.783143362205,"tick":3,"time":"2018-04-01T00:00Z","interestRate":0.04382001651372932},
+{"_id":4,"inflationRate":0.008951820877856592,"totalMoney":10881.385184659062,"tick":4,"time":"2018-05-01T00:00Z","interestRate":0.04115570306406144},
+{"_id":4,"inflationRate":0.009450304732323106,"totalMoney":10494.72141088394,"tick":5,"time":"2018-06-01T00:00Z","interestRate":0.039266844021764474}
+]

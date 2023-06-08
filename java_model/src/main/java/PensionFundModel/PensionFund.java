@@ -18,7 +18,7 @@ public class PensionFund extends Agent<MyModel.Globals> {
     @Variable
     public double currentLiabilityVal;
     @Variable
-    private double currentDuration;
+    public double currentDuration;
 
     @Variable
     public double currentValue;
@@ -30,7 +30,7 @@ public class PensionFund extends Agent<MyModel.Globals> {
 
     public PensionFund() {
         this.portfolio = new ArrayList<Bond>();
-        this.liabilities = new ArrayList<>(Arrays.asList(new Liability(3000, 30.0)));
+        this.liabilities = new ArrayList<>(Arrays.asList(new Liability(3000, 10.0, 0.02)));
     }
 
     private void calculatePortfolioValueAndDuration(double currentTime) {
@@ -82,47 +82,33 @@ public class PensionFund extends Agent<MyModel.Globals> {
     }
     public static Action<PensionFund> receiveCoupons(double time) {
         return Action.create(PensionFund.class, pensionFund -> {
-            double totalCoupons = pensionFund.getMessagesOfType(Messages.CouponPayment.class).stream()
-                    .map(coupon -> coupon.coupons).findFirst().orElse(0.0);
-            pensionFund.cashVal += totalCoupons;
+            if (time > 0.0) {
+                pensionFund.cashVal += pensionFund.cashVal * pensionFund.currentInterestRate;
+            }
+            pensionFund.getMessagesOfType(Messages.CouponPayment.class).forEach(coupon -> pensionFund.cashVal += coupon.coupons);
             pensionFund.portfolio.removeIf(bond -> bond.getEndTime() <= time);
+
+            // pension fund receives interest based on previous interest rates
         });
     }
 
     public static Action<PensionFund> receiveInterestRates() {
         return Action.create(PensionFund.class, pensionFund -> {
-            double[] rates = pensionFund.getMessagesOfType(Messages.InterestUpdate.class).stream()
-                    .map(request -> request.rates).findFirst().orElse(new double[] {0.0, 0.0});
-            pensionFund.currentInterestRate = rates[0];
-            pensionFund.currentInflationRate = rates[1]; // extract the rates out of the message object
-            pensionFund.liabilities.forEach(liability -> liability.updateLiabilityAmount(pensionFund.currentInflationRate)); // TODO check this works
+            pensionFund.getMessagesOfType(Messages.InterestUpdate.class).stream().forEach(msg -> {
+                pensionFund.currentInterestRate = msg.interestRate;
+                pensionFund.currentInflationRate = msg.inflationRate;
+            });
+            pensionFund.liabilities.forEach(liability -> liability.updateLiabilityAmount(pensionFund.currentInflationRate));
             pensionFund.currentLiabilityVal = pensionFund.liabilities.stream().map(liability -> liability.amount).reduce(Double::sum).orElse(0.0);
         });
     }
 
     public static Action<PensionFund> buyHedges(double time, double timestep) {
         return Action.create(PensionFund.class, pensionFund -> {
+            pensionFund.calculatePortfolioValueAndDuration(time);
             pensionFund.liabilities.forEach(
-                    // pension fund spends an amount equivalent to the (predicted) liability on interest bonds
-                    // the bond issuer needs to be the one to decide the coupons of these bonds and the face value etc
-                    // so bond issuer will need to send the bonds back to us
-                    // actually pension fund might not need to have the bonds stored?
-
-                    // timestep 1: pension fund spends an amount equivalent to the predicted liability on interest bonds
-                    // this amount may or may not assume reinvestment - i guess it needs to bc otherwise it reduces into
-                    // a base case
-                    // after timestep 1 they calculate how much money they now think the liability will be
-                    // and they compare this to the amount of money that they will have reinvesting at the current rate
-                    // THEN they reinvest the necessary coupons - so each liability will basically need to have its own
-                    // portfolio of bonds
-                    // can this be abstracted away into weights and stuff?????????????????????????? maybe
-                    // anyway we move - we reinvest the necessary coupons
-                    // and calculate the new expected value of the portfolio at end time
-                    // and THEN we WAIT NO WE DONT NEED TO REINVEST COUPONS YET - we calculate the difference and reinvest
-                    // however much needed to make up that difference
                     liability -> {
                         //TODO THIS WONT WORK AS SOON!!!!! AS SOON AS I HAVE MORE THAN ONE LIABILITY
-                        pensionFund.calculatePortfolioValueAndDuration(time);
                         double length = liability.dueDate - time;
 //                        System.out.println("/home/sophie/Documents/uni/project/git_folder/bash/activate_run_python.sh" + " " + Double.toString(pensionFund.currentInterestRate) + " " +
 //                                Double.toString(pensionFund.currentInflationRate) + " " + Double.toString(pensionFund.currentDuration) + " " + Double.toString(length) + " "
@@ -156,16 +142,17 @@ public class PensionFund extends Agent<MyModel.Globals> {
 //                                System.out.println("Current cash amount: " + pensionFund.cashVal);
 //                                System.out.println("Purchasing Bond for: " + requiredAmount);
                                 Bond newBond = new InterestBond(time + Math.round(requiredLength), pensionFund.currentInterestRate, requiredAmount);
+                                // System.out.println("duration of new bond: " + newBond.calculateDuration(time, pensionFund.currentInterestRate, pensionFund.currentInflationRate));
                                 pensionFund.cashVal -= requiredAmount;
-                                pensionFund.getLinks(Links.MarketLink.class).send(Messages.PurchaseBonds.class, (msg, link) -> {
+                                pensionFund.getLinks(Links.BondPurchaseLink.class).send(Messages.PurchaseBonds.class, (msg, link) -> {
                                     msg.bondToPurchase = newBond;
                                 });
                                 pensionFund.portfolio.add(newBond);
                             }
                             pensionFund.calculatePortfolioValueAndDuration(time); // Updates current value with the new bond todo can probably optimise this
-//                            System.out.println("bond end times: " + pensionFund.portfolio.stream().map(Bond::getEndTime).collect(Collectors.toList()));
+                            // System.out.println("Current Duration:" + pensionFund.currentDuration);
                         }
-
+                        System.out.println("Current Bond Portfolio " + pensionFund.strategy + pensionFund.portfolio.stream().map(bond -> (bond.getEndTime() - time)).collect(Collectors.toList()));
                     }
             );
         });

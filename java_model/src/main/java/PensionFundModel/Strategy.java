@@ -1,8 +1,8 @@
 package PensionFundModel;
 
-import shaded.parquet.com.fasterxml.jackson.annotation.JsonValue;
-
 public enum Strategy {
     DURATION_MATCHING,
-    VALUE_MATCHING
+    VALUE_MATCHING,
+    SHORT_VALUE_MATCHING,
+    INEQ_DURATION_MATCHING
 }

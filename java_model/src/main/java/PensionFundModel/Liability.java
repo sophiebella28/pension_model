@@ -5,17 +5,16 @@ public class Liability {
     public final double dueDate;
 
 
-    public Liability(double amount, double dueDate) {
+    public Liability(double amount, double dueDate, double initCPI) {
         this.amount = amount; // NOTE: this isn't fixed - it depends on the RPI changes
         this.dueDate = dueDate;
     }
 
     public void updateLiabilityAmount(double currentCPI) {
-        amount = amount * Math.min(1.0 + currentCPI, 1.05);
-    }
-
-    public double valueLiability(double forecastedCPI, double time) {
-        return amount * Math.pow(Math.min(1.0 + forecastedCPI, 1.05), dueDate - time);
-
+        amount = amount * Math.max(Math.min(currentCPI + 1, 1.05), 1.0);
+//        if(currentCPI + 1 > 1.05 || currentCPI + 1 < 1.0 ) {
+//            System.out.println("CAP HIT");
+//            System.out.println(currentCPI);
+//        }
     }
 }

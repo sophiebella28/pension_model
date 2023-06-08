@@ -5,18 +5,27 @@ import simudyne.core.abm.GlobalState;
 import simudyne.core.abm.Group;
 import simudyne.core.abm.Sequence;
 import simudyne.core.annotations.Input;
+import simudyne.core.annotations.Variable;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 //This is your main model class where you define the components of your model, including the GlobalState, setup, and step.
 public class MyModel extends AgentBasedModel<MyModel.Globals> {
 
     private static final String COMMA_DELIMITER = ",";
+
+    @Input(name = "Use Downward Curve")
+    public boolean useDownwardCurve;
+
+    @Input(name = "Initial Interest Rate")
+    public double initInterest;
+
+    @Input(name = "Initial Inflation Rate")
+    public double initInflation;
 
     //Globals stores all of your variables and data structures that you want your agents to be able to access
     //Store information here that is system-level knowledge (ie - # of Agents or static variables)
@@ -32,18 +41,21 @@ public class MyModel extends AgentBasedModel<MyModel.Globals> {
     @Input(name = "Number of Value Matching Funds")
     public int nmValuePensionFunds = 1;
 
+    @Input(name = "Number of 1Y Value Matching Funds")
+    public int nmShortValuePensionFunds = 1;
+
+    @Input(name = "Number of Ineq Duration Matching Funds")
+    public int nmIneqDurationPensionFunds = 1;
+
     public double time;
     @Input(name = "Time Step in ticks")
     public long timeStep = 1;
 
     @Input(name = "Drift Short Term Interest Rates")
-    public double driftShortTerm = 0.02;
+    public double driftShortTerm = 0.1;
 
     @Input(name = "Volatility Short Term Interest Rates")
     public double volatilityShortTerm = 0.001;
-
-    @Input(name = "Select Theta Curve")
-    public boolean useDownwardCurve = false;
 
     public List<Double> thetas = new ArrayList<>();
 
@@ -54,22 +66,22 @@ public class MyModel extends AgentBasedModel<MyModel.Globals> {
     public void init() {
         registerAgentTypes(PensionFund.class, BondIssuer.class);
         registerLinkTypes(Links.MarketLink.class);
+        registerLinkTypes(Links.BondPurchaseLink.class);
     }
 
     //Define your agent groups and connections in the setup. This is where the environment and agents are generated
     @Override
     public void setup() {
         String thetaFileName;
-        if (getGlobals().useDownwardCurve) {
+        if (useDownwardCurve) {
             thetaFileName = "downward_curve.csv";
         } else {
             thetaFileName = "upward_curve.csv";
         }
 
-        try (BufferedReader br = new BufferedReader(new FileReader("input_files" + thetaFileName))) {
+        try (BufferedReader br = new BufferedReader(new FileReader("theta_files/" + thetaFileName))) {
             String line;
             while ((line = br.readLine()) != null) {
-                String[] values = line.split(COMMA_DELIMITER);
                 getGlobals().thetas.add(Double.parseDouble(line));
             }
         } catch (IOException e) {
@@ -83,12 +95,31 @@ public class MyModel extends AgentBasedModel<MyModel.Globals> {
         // Generates given number of pension funds
         Group<PensionFund> durationPensionFundGroup = generateGroup(PensionFund.class, getGlobals().nmDurationPensionFunds, agent -> {agent.strategy = Strategy.DURATION_MATCHING.toString();});
         Group<PensionFund> valuePensionFundGroup = generateGroup(PensionFund.class, getGlobals().nmValuePensionFunds, agent -> {agent.strategy = Strategy.VALUE_MATCHING.toString();});
-        Group<BondIssuer> bondIssuerGroup = generateGroup(BondIssuer.class, 1);
+        Group<PensionFund> shortValuePensionFundGroup = generateGroup(PensionFund.class, getGlobals().nmShortValuePensionFunds, agent -> {agent.strategy = Strategy.SHORT_VALUE_MATCHING.toString();});
+        Group<PensionFund> ineqDurationPensionFundGroup = generateGroup(PensionFund.class, getGlobals().nmIneqDurationPensionFunds, agent -> {agent.strategy = Strategy.INEQ_DURATION_MATCHING.toString();});
+
+        Group<BondIssuer> bondIssuerGroup = generateGroup(BondIssuer.class, 1, agent ->
+        {
+            agent.interestRate = initInterest;
+            agent.inflationRate = initInflation;
+        });
         // Fully connects pension funds with bond issuer
         durationPensionFundGroup.fullyConnected(bondIssuerGroup, Links.MarketLink.class);
         bondIssuerGroup.fullyConnected(durationPensionFundGroup, Links.MarketLink.class);
         valuePensionFundGroup.fullyConnected(bondIssuerGroup, Links.MarketLink.class);
         bondIssuerGroup.fullyConnected(valuePensionFundGroup, Links.MarketLink.class);
+        shortValuePensionFundGroup.fullyConnected(bondIssuerGroup, Links.MarketLink.class);
+        bondIssuerGroup.fullyConnected(shortValuePensionFundGroup, Links.MarketLink.class);
+        ineqDurationPensionFundGroup.fullyConnected(bondIssuerGroup, Links.MarketLink.class);
+        bondIssuerGroup.fullyConnected(ineqDurationPensionFundGroup, Links.MarketLink.class);
+
+        // Fully connects pension funds with bond issuer using purchase links - used to record whether a pension fund made a purchase that tick
+        durationPensionFundGroup.fullyConnected(bondIssuerGroup, Links.BondPurchaseLink.class);
+        valuePensionFundGroup.fullyConnected(bondIssuerGroup, Links.BondPurchaseLink.class);
+        shortValuePensionFundGroup.fullyConnected(bondIssuerGroup, Links.BondPurchaseLink.class);
+        ineqDurationPensionFundGroup.fullyConnected(bondIssuerGroup, Links.BondPurchaseLink.class);
+
+
         super.setup();
     }
 
@@ -119,10 +150,10 @@ public class MyModel extends AgentBasedModel<MyModel.Globals> {
         //     from the government
         //System.out.println("pay coupons");
         run(payCoupons);
-        //System.out.println("pay liabilities");
-        run(payLiabilities);
         //System.out.println("update interest");
         run(updateInterest);
+        //System.out.println("pay liabilities");
+        run(payLiabilities);
         //System.out.println("perform hedges");
         run(performHedges);
 

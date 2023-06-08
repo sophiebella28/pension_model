@@ -8,7 +8,8 @@ public class Messages {
     }
 
     public static class InterestUpdate extends Message {
-        public double[] rates;
+        public double interestRate;
+        public double inflationRate;
     }
 
     public static class PurchaseBonds extends Message {

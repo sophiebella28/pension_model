@@ -5,14 +5,13 @@ public class IndexBond implements Bond {
 
     private final double endTime;
     private final double couponRate;
-    private final double initialCPI;
     private final double faceValue;
-
-    public IndexBond(double endTime, double couponRate, double initialCPI, double faceValue) {
+    private double accumulatedCPI;
+    public IndexBond(double endTime, double couponRate, double faceValue) {
         this.endTime = endTime;
         this.couponRate = couponRate;
-        this.initialCPI = initialCPI;
         this.faceValue = faceValue;
+        accumulatedCPI = 1.0;
     }
 
     @Override
@@ -27,10 +26,11 @@ public class IndexBond implements Bond {
 
     @Override
     public double requestCouponPayments(double time, double currentCPI) {
+        accumulatedCPI *= currentCPI;
         if (time >= endTime) {
-            return couponRate * currentCPI / initialCPI * faceValue + faceValue;
+            return couponRate * faceValue + faceValue;
         } else {
-            return couponRate * currentCPI / initialCPI * faceValue;
+            return couponRate * faceValue;
         }
     }
 
@@ -38,16 +38,16 @@ public class IndexBond implements Bond {
         int length = (int) Math.round(endTime - currentTime);
         double price = 0.0;
         for (int i = 1; i < length; i++) {
-            price += (couponRate * (currentCPI / initialCPI) * faceValue) / Math.pow(1 + currentRate, i);
+            price += (couponRate * accumulatedCPI * currentCPI * faceValue) / Math.pow(1 + currentRate, i);
         }
-        price += (couponRate * (currentCPI / initialCPI) * faceValue + faceValue) / Math.pow(1 + currentRate, length);
+        price += (couponRate * accumulatedCPI * currentCPI  * faceValue + faceValue) / Math.pow(1 + currentRate, length);
         return price;
     }
 
     @Override
     public double calculateDuration(double currentTime, double currentInterestRate, double currentCPI) {
         int length = (int) Math.round(endTime - currentTime);
-        double realRedemptionYield = (1 + currentInterestRate) * (currentCPI / initialCPI);
+        double realRedemptionYield = (1 + currentInterestRate) * accumulatedCPI * currentCPI;
         double numerator = 0;
         double denominator = 0;
         for (int i = 1; i < length; i++) {
