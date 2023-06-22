@@ -14,6 +14,19 @@ public class IndexBond implements Bond {
         accumulatedCPI = 1.0;
     }
 
+    public IndexBond(double endTime, double currentInterestRate, double inflationPrediction, double currentValue, double time) {
+        this.endTime = endTime;
+        this.couponRate = currentInterestRate * 0.5;
+        this.faceValue = calculateFaceValue(currentInterestRate, inflationPrediction, endTime - time, currentValue);
+        accumulatedCPI = 1.0;
+    }
+
+    private double calculateFaceValue(double currentInterestRate, double inflationPrediction, double length, double currentValue) {
+        double powerTerm = Math.pow(inflationPrediction, length) / Math.pow(1 + currentInterestRate, length);
+        double sumTerm = couponRate * inflationPrediction * ( 1 - powerTerm) / (1 + currentInterestRate - inflationPrediction);
+        return currentValue / (powerTerm + sumTerm);
+    }
+
     @Override
     public double getEndTime() {
         return endTime;
@@ -26,11 +39,11 @@ public class IndexBond implements Bond {
 
     @Override
     public double requestCouponPayments(double time, double currentCPI) {
-        accumulatedCPI *= currentCPI;
+        accumulatedCPI *= (1 + currentCPI);
         if (time >= endTime) {
-            return couponRate * faceValue + faceValue;
+            return couponRate * faceValue * accumulatedCPI + faceValue * accumulatedCPI;
         } else {
-            return couponRate * faceValue;
+            return couponRate * faceValue * accumulatedCPI;
         }
     }
 
@@ -38,25 +51,17 @@ public class IndexBond implements Bond {
         int length = (int) Math.round(endTime - currentTime);
         double price = 0.0;
         for (int i = 1; i < length; i++) {
-            price += (couponRate * accumulatedCPI * currentCPI * faceValue) / Math.pow(1 + currentRate, i);
+            price += (couponRate * accumulatedCPI * Math.pow(currentCPI + 1, i) * faceValue) / Math.pow((1 + currentRate), i);
         }
-        price += (couponRate * accumulatedCPI * currentCPI  * faceValue + faceValue) / Math.pow(1 + currentRate, length);
+        price += ((couponRate + 1) * accumulatedCPI * Math.pow(currentCPI + 1, length) * faceValue) /  Math.pow((1 + currentRate), length);
         return price;
     }
 
     @Override
     public double calculateDuration(double currentTime, double currentInterestRate, double currentCPI) {
         int length = (int) Math.round(endTime - currentTime);
-        double realRedemptionYield = (1 + currentInterestRate) * accumulatedCPI * currentCPI;
-        double numerator = 0;
-        double denominator = 0;
-        for (int i = 1; i < length; i++) {
-            double ithContribution = couponRate * faceValue * Math.pow(1/realRedemptionYield, i);
-            numerator += ithContribution * i;
-            denominator += ithContribution;
-        }
-        numerator += (couponRate + 1) * faceValue * Math.pow(1/realRedemptionYield, length) * length;
-        denominator += (couponRate + 1) * faceValue * Math.pow(1/realRedemptionYield, length);
-        return numerator/denominator;
+        double yield = ( currentInterestRate - currentCPI ) / (1 + currentCPI);
+        return (1 + yield) / yield -
+                (1 + yield + length * (couponRate - yield)) / (couponRate * (Math.pow(1 + yield, length) - 1) + yield);
     }
 }

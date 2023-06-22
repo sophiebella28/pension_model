@@ -35,6 +35,7 @@ public class BondIssuer extends Agent<MyModel.Globals> {
                 bondIssuer.totalMoney += purchaseBonds.bondToPurchase.getFaceValue();
             });
         });
+
     }
 
     public static Action<BondIssuer> receiveSoldBonds() {
@@ -52,14 +53,6 @@ public class BondIssuer extends Agent<MyModel.Globals> {
     }
 
     public static Action<BondIssuer> giveCoupons(double time) {
-            // need to add something which iterates over all of the bonds in the portfolio and then calculates
-            // the coupon payments to be paid for each bond in the portfolio and who to pay it to (can ignore for now
-            // bc only one pension)
-
-            // if i have a bond then i do the calculation in here?? but then how do I do the two different calculations?
-            // can just do if x do this if y do this
-            // I guess just have an interface that takes an additional scale value and set it to be 1 for fixed ones
-            // but then it can be the same function for both?????? doesnt matter I think. This will prob help in the future
             return Action.create(BondIssuer.class, bondIssuer -> {
                 for (long pensionFundID : bondIssuer.portfolios.keySet()) { // Iterate over all bonds and total up amount of coupons to send
                     double totalCoupons = 0.0;
@@ -83,10 +76,13 @@ public class BondIssuer extends Agent<MyModel.Globals> {
                 );
             });}
     void updateRates(double theta) {
-        mvn = getPrng().multivariateNormal(new double[]{0.0, 0.0}, new double[][]{{1.0, 0.19}, {0.19, 1.0}});
+        mvn = getPrng().multivariateNormal(new double[]{0.0, 0.0}, new double[][]{{1.0, getGlobals().corr}, {getGlobals().corr, 1.0}});
         double[] randomVals = mvn.sample();
-        interestRate += ( ( theta - getGlobals().driftShortTerm * interestRate)  + getGlobals().volatilityShortTerm * randomVals[0]);
-        inflationRate = 0.000383 + 0.982335 * inflationRate + 0.003 * randomVals[1]; //TODO: remove magic numbers
+        interestRate += ( ( theta - getGlobals().interestDrift * interestRate)  + getGlobals().interestVolatility * randomVals[0]);
+        inflationRate = getGlobals().inflationConstant + getGlobals().inflationDrift * inflationRate + getGlobals().inflationVolatility * randomVals[1];
+        if (inflationRate < 0.0) {
+            inflationRate += 0.01;
+        }
     }
 
 
